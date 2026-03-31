@@ -72,25 +72,47 @@ def get_ffmpeg_path() -> str:
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
-def discover_videos() -> list[dict]:
-    """Find all mp4 files in the video_training folder."""
-    videos = []
-    if not os.path.isdir(VIDEO_DIR):
-        return videos
+def _clean_title(raw: str) -> str:
+    title = os.path.splitext(raw)[0]
+    for suffix in ["(360p, h264)", "(720p, h264)", "(1080p, h264)", "(360p, h265)", "(1)"]:
+        title = title.replace(suffix, "")
+    title = title.replace(" - Tiffany Cheng", "").strip().rstrip("-").strip()
+    if title.endswith(".mp4"):
+        title = title[:-4].strip()
+    return title
 
-    for filepath in sorted(glob.glob(os.path.join(VIDEO_DIR, "*.mp4"))):
-        filename = os.path.basename(filepath)
-        title = os.path.splitext(filename)[0]
-        # Clean up title: remove resolution/codec suffixes
-        for suffix in ["(360p, h264)", "(720p, h264)", "(1080p, h264)", "(360p, h265)", "(1)"]:
-            title = title.replace(suffix, "")
-        title = title.replace(" - Tiffany Cheng", "").strip().rstrip("-").strip()
-        videos.append({
-            "filepath": filepath,
-            "filename": filename,
-            "title": title,
-            "video_id": filename,  # use filename as unique ID
-        })
+
+def discover_videos() -> list[dict]:
+    """Find videos from mp4 files or cached transcripts."""
+    seen_ids = set()
+    videos = []
+
+    # First: discover from actual video files
+    if os.path.isdir(VIDEO_DIR):
+        for filepath in sorted(glob.glob(os.path.join(VIDEO_DIR, "*.mp4"))):
+            filename = os.path.basename(filepath)
+            videos.append({
+                "filepath": filepath,
+                "filename": filename,
+                "title": _clean_title(filename),
+                "video_id": filename,
+            })
+            seen_ids.add(filename)
+
+    # Second: discover from cached transcripts (for cloud deployment without video files)
+    if os.path.isdir(TRANSCRIPT_DIR):
+        for txt_path in sorted(glob.glob(os.path.join(TRANSCRIPT_DIR, "*.txt"))):
+            txt_name = os.path.basename(txt_path)
+            video_id = txt_name[:-4] if txt_name.endswith(".txt") else txt_name
+            if video_id not in seen_ids:
+                videos.append({
+                    "filepath": None,
+                    "filename": video_id,
+                    "title": _clean_title(video_id),
+                    "video_id": video_id,
+                })
+                seen_ids.add(video_id)
+
     return videos
 
 
@@ -116,6 +138,9 @@ def transcribe_video(video: dict) -> str | None:
     if os.path.exists(cache_file):
         with open(cache_file, "r") as f:
             return f.read()
+
+    if not video.get("filepath") or not os.path.exists(video["filepath"]):
+        return None
 
     client = get_openai_client()
 
