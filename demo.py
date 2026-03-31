@@ -23,7 +23,10 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_API_KEY = (
+    os.getenv("OPENAI_API_KEY", "")
+    or st.secrets.get("OPENAI_API_KEY", "")
+)
 CHROMA_DIR = os.path.join(os.path.dirname(__file__), ".chroma_data")
 TRANSCRIPT_DIR = os.path.join(os.path.dirname(__file__), ".transcripts")
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), "video_training")
@@ -411,13 +414,13 @@ with st.sidebar:
         )
         st.rerun()
     elif count == 0 and not OPENAI_API_KEY:
-        st.error("Set OPENAI_API_KEY in your .env file to get started.")
+        st.error("Set OPENAI_API_KEY in your .env file (local) or Streamlit Secrets (cloud).")
     elif count == 0 and len(local_videos) == 0:
         st.warning("No .mp4 files found in `video_training/` folder.")
 
     if st.button("🔄 Re-ingest Videos", use_container_width=True):
         if not OPENAI_API_KEY:
-            st.error("Set OPENAI_API_KEY in your .env file first.")
+            st.error("Set OPENAI_API_KEY in your .env file (local) or Streamlit Secrets (cloud).")
         else:
             bar = st.progress(0, text="Starting...")
             status = st.empty()
@@ -499,7 +502,7 @@ prompt = st.session_state.pop("pending_prompt", None) or st.chat_input(
 
 if prompt:
     if not OPENAI_API_KEY:
-        st.error("Please set your OPENAI_API_KEY in the .env file.")
+        st.error("Please set your OPENAI_API_KEY in the .env file (local) or Streamlit Secrets (cloud).")
         st.stop()
 
     if count == 0:
