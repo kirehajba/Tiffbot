@@ -751,10 +751,10 @@ elif not st.session_state.messages and count == 0:
         unsafe_allow_html=True,
     )
 
-# Chat input
-prompt = st.session_state.pop("pending_prompt", None) or st.chat_input(
-    "Ask about leadership, career growth, executive presence..."
-)
+# Chat input — always render the widget so Streamlit tracks it across reruns
+pending = st.session_state.pop("pending_prompt", None)
+user_input = st.chat_input("Ask about leadership, career growth, executive presence...")
+prompt = pending or user_input
 
 if prompt:
     if not OPENAI_API_KEY:
