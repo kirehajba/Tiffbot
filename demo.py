@@ -380,16 +380,218 @@ def generate_followups(question: str, answer: str) -> list[str]:
 # Streamlit UI
 # ---------------------------------------------------------------------------
 
+LOGO_WHITE = "https://inspiremyday.org/wp-content/uploads/2026/01/INSPIRE-MY-DAY-LOGO-White.png"
+LOGO_BLUE = "https://inspiremyday.org/wp-content/uploads/2026/01/Inspiremyday-blue-logo.png"
+
 st.set_page_config(
-    page_title="TiiffBot — AI Business Coach",
-    page_icon="🎯",
+    page_title="Inspire My Day — AI Executive Coach",
+    page_icon="https://inspiremyday.org/wp-content/uploads/2026/01/Inspiremyday-blue-logo.png",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# --- Sidebar ---
+# ---- Custom CSS ----
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+:root {
+    --navy:       #1B2A4A;
+    --navy-light: #243556;
+    --gold:       #C9A84C;
+    --gold-light: #E8D48B;
+    --cream:      #FAF8F5;
+    --slate:      #64748B;
+    --white:      #FFFFFF;
+}
+
+/* Global */
+.stApp {
+    background-color: var(--cream) !important;
+}
+.main .block-container {
+    max-width: 860px;
+    padding-top: 2rem;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #1B2A4A 0%, #162240 100%) !important;
+    border-right: 1px solid rgba(201,168,76,0.2);
+}
+section[data-testid="stSidebar"] * {
+    color: #CBD5E1 !important;
+}
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] strong {
+    color: #FFFFFF !important;
+}
+section[data-testid="stSidebar"] hr {
+    border-color: rgba(201,168,76,0.25) !important;
+}
+section[data-testid="stSidebar"] .stMetric label {
+    color: #94A3B8 !important;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+section[data-testid="stSidebar"] .stMetric [data-testid="stMetricValue"] {
+    color: #C9A84C !important;
+    font-weight: 700;
+}
+section[data-testid="stSidebar"] .stButton > button {
+    background: transparent !important;
+    border: 1px solid rgba(201,168,76,0.4) !important;
+    color: #C9A84C !important;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.82rem;
+    transition: all 0.2s;
+}
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(201,168,76,0.12) !important;
+    border-color: #C9A84C !important;
+}
+
+/* Chat messages */
+.stChatMessage {
+    border-radius: 12px !important;
+    padding: 1rem 1.25rem !important;
+    margin-bottom: 0.5rem !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+[data-testid="stChatMessageContent"] p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #1E293B;
+}
+
+/* Chat input */
+.stChatInput {
+    border-color: #CBD5E1 !important;
+}
+.stChatInput > div {
+    border-radius: 12px !important;
+    border: 1.5px solid #CBD5E1 !important;
+    box-shadow: 0 1px 4px rgba(27,42,74,0.06) !important;
+}
+.stChatInput > div:focus-within {
+    border-color: #C9A84C !important;
+    box-shadow: 0 0 0 2px rgba(201,168,76,0.15) !important;
+}
+
+/* Follow-up / suggestion buttons */
+.main .stButton > button {
+    background: var(--white) !important;
+    border: 1.5px solid #E2E8F0 !important;
+    color: #1B2A4A !important;
+    border-radius: 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.84rem;
+    font-weight: 500;
+    padding: 0.6rem 1rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    text-align: left !important;
+}
+.main .stButton > button:hover {
+    border-color: #C9A84C !important;
+    color: #C9A84C !important;
+    box-shadow: 0 2px 8px rgba(201,168,76,0.12);
+    transform: translateY(-1px);
+}
+
+/* Hero heading */
+.hero-heading {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.9rem;
+    font-weight: 600;
+    color: #1B2A4A;
+    text-align: center;
+    margin-bottom: 0.25rem;
+    line-height: 1.3;
+}
+.hero-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    color: #64748B;
+    text-align: center;
+    margin-bottom: 2rem;
+    line-height: 1.6;
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.hero-logo {
+    display: block;
+    margin: 0 auto 1.25rem auto;
+    width: 200px;
+}
+.hero-divider {
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(90deg, #C9A84C, #E8D48B);
+    margin: 0 auto 1.5rem auto;
+    border-radius: 2px;
+}
+
+/* Source chips */
+.source-chip {
+    display: inline-block;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 0.25rem 0.65rem;
+    margin: 0.15rem 0.25rem;
+    font-size: 0.78rem;
+    color: #475569;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Sidebar video list */
+.sidebar-video-item {
+    font-size: 0.82rem;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    color: #94A3B8;
+}
+
+/* Section label */
+.section-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #64748B;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+/* Followup section label */
+.followup-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: #94A3B8;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+/* Hide default Streamlit header/footer */
+#MainMenu {visibility: hidden;}
+header {visibility: hidden;}
+footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ---- Sidebar ----
 with st.sidebar:
-    st.title("🎯 TiiffBot")
-    st.caption("AI Business Coach by Tiffany Cheng")
+    st.image(LOGO_WHITE, width=180)
+    st.markdown("")
+    st.caption("AI-Powered Executive Coaching")
     st.divider()
 
     collection = get_chroma_collection()
@@ -399,11 +601,15 @@ with st.sidebar:
         count = 0
 
     local_videos = discover_videos()
-    st.metric("Indexed chunks", count)
-    st.caption(f"{len(local_videos)} videos in video_training/")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Knowledge Base", f"{count} chunks")
+    with col2:
+        st.metric("Videos", f"{len(local_videos)}")
 
     if count == 0 and OPENAI_API_KEY and len(local_videos) > 0:
-        st.info("First run — transcribing & indexing videos...")
+        st.info("Preparing knowledge base...")
         bar = st.progress(0, text="Starting...")
         status = st.empty()
         result = ingest_videos(bar, status)
@@ -416,52 +622,66 @@ with st.sidebar:
     elif count == 0 and not OPENAI_API_KEY:
         st.error("Set OPENAI_API_KEY in your .env file (local) or Streamlit Secrets (cloud).")
     elif count == 0 and len(local_videos) == 0:
-        st.warning("No .mp4 files found in `video_training/` folder.")
-
-    if st.button("🔄 Re-ingest Videos", use_container_width=True):
-        if not OPENAI_API_KEY:
-            st.error("Set OPENAI_API_KEY in your .env file (local) or Streamlit Secrets (cloud).")
-        else:
-            bar = st.progress(0, text="Starting...")
-            status = st.empty()
-            result = ingest_videos(bar, status)
-            status.text("")
-            st.success(
-                f"Done! Ingested **{result['ingested']}** videos, "
-                f"skipped {result['skipped']}, failed {result['failed']}."
-            )
-            st.rerun()
+        st.warning("No videos or transcripts found.")
 
     st.divider()
 
     if local_videos:
-        st.markdown("**Training videos:**")
+        st.markdown("**Trained On**")
         for v in local_videos:
-            st.markdown(f"- {v['title']}")
+            st.markdown(
+                f'<div class="sidebar-video-item">&#9654;&ensp;{v["title"]}</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown("")
 
     st.divider()
-    st.markdown("[🌐 inspiremyday.org](https://inspiremyday.org)")
-    st.markdown("[📺 YouTube Channel](https://www.youtube.com/@inspiremydaytiffany)")
 
-    if st.button("🗑️ Clear chat"):
-        st.session_state.messages = []
-        st.rerun()
+    link_col1, link_col2 = st.columns(2)
+    with link_col1:
+        st.markdown("[Website](https://inspiremyday.org)")
+    with link_col2:
+        st.markdown("[YouTube](https://www.youtube.com/@inspiremydaytiffany)")
+
+    st.markdown("")
+
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        if st.button("Re-index", use_container_width=True):
+            if not OPENAI_API_KEY:
+                st.error("Set OPENAI_API_KEY first.")
+            else:
+                bar = st.progress(0, text="Starting...")
+                status = st.empty()
+                result = ingest_videos(bar, status)
+                status.text("")
+                st.success(f"Indexed {result['ingested']} videos.")
+                st.rerun()
+    with btn_col2:
+        if st.button("Clear chat", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
+
+    st.markdown("")
+    st.caption("Powered by Inspire My Day")
 
 
-# --- Main chat area ---
-st.header("Ask your business coach")
+# ---- Main chat area ----
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # Render chat history
 for msg_idx, msg in enumerate(st.session_state.messages):
-    with st.chat_message(msg["role"], avatar="🎯" if msg["role"] == "assistant" else None):
+    avatar = LOGO_BLUE if msg["role"] == "assistant" else None
+    with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
         if msg.get("sources"):
-            st.caption("**Referenced videos:**")
-            for src in msg["sources"]:
-                st.markdown(f"📹 _{src['title']}_")
+            chips_html = "".join(
+                f'<span class="source-chip">&#9654; {src["title"]}</span>'
+                for src in msg["sources"]
+            )
+            st.markdown(chips_html, unsafe_allow_html=True)
 
 # Show follow-up buttons only on the LAST assistant message
 if (
@@ -469,7 +689,7 @@ if (
     and st.session_state.messages[-1]["role"] == "assistant"
     and st.session_state.messages[-1].get("followups")
 ):
-    st.markdown("**You might also want to ask:**")
+    st.markdown('<p class="followup-label">Continue the conversation</p>', unsafe_allow_html=True)
     followups = st.session_state.messages[-1]["followups"]
     cols = st.columns(len(followups))
     for i, q in enumerate(followups):
@@ -478,14 +698,34 @@ if (
                 st.session_state.pending_prompt = q
                 st.rerun()
 
-# Empty state suggestions
+# Empty / welcome state
 if not st.session_state.messages and count > 0:
-    st.markdown("---")
-    st.markdown("**Try asking:**")
+    st.markdown("")
+    st.markdown(
+        f'<img src="{LOGO_BLUE}" class="hero-logo" alt="Inspire My Day">',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="hero-divider"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="hero-heading">Your AI Executive Coach</p>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<p class="hero-sub">'
+        "Hi, I'm Tiffany. I help high-performing directors and senior leaders "
+        "advance into VP, GM, and C-suite roles. Ask me anything about your career."
+        "</p>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<p class="section-label" style="text-align:center;">Popular questions</p>',
+        unsafe_allow_html=True,
+    )
     suggestions = [
         "Is the promotion from Director to VP really worth it?",
         "How should I write my executive resume?",
-        "Why are executive jobs hidden?",
+        "How do I build executive presence?",
         "Why do I feel underappreciated at work?",
     ]
     cols = st.columns(2)
@@ -495,9 +735,25 @@ if not st.session_state.messages and count > 0:
                 st.session_state.pending_prompt = q
                 st.rerun()
 
-# Pick up a pending prompt from follow-up / suggestion buttons, or from chat input
+elif not st.session_state.messages and count == 0:
+    st.markdown("")
+    st.markdown(
+        f'<img src="{LOGO_BLUE}" class="hero-logo" alt="Inspire My Day">',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="hero-divider"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="hero-heading">Your AI Executive Coach</p>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<p class="hero-sub">Setting up the knowledge base. Please check the sidebar for status.</p>',
+        unsafe_allow_html=True,
+    )
+
+# Chat input
 prompt = st.session_state.pop("pending_prompt", None) or st.chat_input(
-    "Ask about leadership, promotions, executive presence..."
+    "Ask about leadership, career growth, executive presence..."
 )
 
 if prompt:
@@ -506,7 +762,7 @@ if prompt:
         st.stop()
 
     if count == 0:
-        st.warning("Please add videos to `video_training/` and refresh.")
+        st.warning("Knowledge base is empty. Please wait for indexing to complete.")
         st.stop()
 
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -529,7 +785,7 @@ if prompt:
         ),
     })
 
-    with st.chat_message("assistant", avatar="🎯"):
+    with st.chat_message("assistant", avatar=LOGO_BLUE):
         client = get_openai_client()
         stream = client.chat.completions.create(
             model="gpt-4o",
@@ -548,11 +804,12 @@ if prompt:
         response = st.write_stream(token_generator())
 
         if sources:
-            st.caption("**Referenced videos:**")
-            for src in sources:
-                st.markdown(f"📹 _{src['title']}_")
+            chips_html = "".join(
+                f'<span class="source-chip">&#9654; {src["title"]}</span>'
+                for src in sources
+            )
+            st.markdown(chips_html, unsafe_allow_html=True)
 
-    # Generate follow-up questions
     followups = generate_followups(prompt, response)
 
     st.session_state.messages.append({
