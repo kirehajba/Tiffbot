@@ -393,31 +393,38 @@ st.set_page_config(
 # ---- Custom CSS ----
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 
 :root {
-    --navy:       #1B2A4A;
-    --navy-light: #243556;
-    --gold:       #C9A84C;
-    --gold-light: #E8D48B;
-    --cream:      #FAF8F5;
-    --slate:      #64748B;
-    --white:      #FFFFFF;
+    --navy:        #1B2A4A;
+    --navy-deep:   #162240;
+    --navy-light:  #243556;
+    --gold:        #C9A84C;
+    --gold-light:  #E8D48B;
+    --gold-subtle: rgba(201,168,76,0.08);
+    --cream:       #FAF8F5;
+    --cream-dark:  #F3F0EB;
+    --slate:       #64748B;
+    --slate-light: #94A3B8;
+    --ink:         #1E293B;
+    --white:       #FFFFFF;
 }
 
-/* Global */
+/* ===== Global ===== */
 .stApp {
     background-color: var(--cream) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
 .main .block-container {
     max-width: 860px;
-    padding-top: 2rem;
+    padding-top: 1.5rem;
+    padding-bottom: 1rem;
 }
 
-/* Sidebar */
+/* ===== Sidebar ===== */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #1B2A4A 0%, #162240 100%) !important;
-    border-right: 1px solid rgba(201,168,76,0.2);
+    background: linear-gradient(180deg, #1B2A4A 0%, #131D36 100%) !important;
+    border-right: 1px solid rgba(201,168,76,0.15);
 }
 section[data-testid="stSidebar"] * {
     color: #CBD5E1 !important;
@@ -429,157 +436,231 @@ section[data-testid="stSidebar"] strong {
     color: #FFFFFF !important;
 }
 section[data-testid="stSidebar"] hr {
-    border-color: rgba(201,168,76,0.25) !important;
+    border-color: rgba(201,168,76,0.2) !important;
 }
 section[data-testid="stSidebar"] .stMetric label {
     color: #94A3B8 !important;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
 }
 section[data-testid="stSidebar"] .stMetric [data-testid="stMetricValue"] {
     color: #C9A84C !important;
     font-weight: 700;
+    font-size: 1.1rem;
 }
 section[data-testid="stSidebar"] .stButton > button {
     background: transparent !important;
-    border: 1px solid rgba(201,168,76,0.4) !important;
+    border: 1px solid rgba(201,168,76,0.35) !important;
     color: #C9A84C !important;
     border-radius: 8px;
     font-weight: 500;
-    font-size: 0.82rem;
-    transition: all 0.2s;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    transition: all 0.25s ease;
 }
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(201,168,76,0.12) !important;
+    background: rgba(201,168,76,0.1) !important;
     border-color: #C9A84C !important;
 }
 
-/* Chat messages */
+/* ===== Chat messages — shared ===== */
 .stChatMessage {
-    border-radius: 12px !important;
-    padding: 1rem 1.25rem !important;
-    margin-bottom: 0.5rem !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border-radius: 16px !important;
+    padding: 1.1rem 1.4rem !important;
+    margin-bottom: 0.75rem !important;
+    font-family: 'Inter', sans-serif !important;
+    border: none !important;
 }
-[data-testid="stChatMessageContent"] p {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
-    line-height: 1.7;
-    color: #1E293B;
+[data-testid="stChatMessageContent"] p,
+[data-testid="stChatMessageContent"] li {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.93rem;
+    line-height: 1.75;
+    color: var(--ink);
 }
-
-/* Chat input */
-.stChatInput {
-    border-color: #CBD5E1 !important;
-}
-.stChatInput > div {
-    border-radius: 12px !important;
-    border: 1.5px solid #CBD5E1 !important;
-    box-shadow: 0 1px 4px rgba(27,42,74,0.06) !important;
-}
-.stChatInput > div:focus-within {
-    border-color: #C9A84C !important;
-    box-shadow: 0 0 0 2px rgba(201,168,76,0.15) !important;
+[data-testid="stChatMessageContent"] strong {
+    color: var(--navy);
+    font-weight: 600;
 }
 
-/* Follow-up / suggestion buttons */
+/* ---- User message bubble ---- */
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+    background: var(--navy) !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(27,42,74,0.15);
+}
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) p {
+    color: #F1F5F9 !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) [data-testid="stChatMessageAvatarUser"] {
+    background: var(--gold) !important;
+}
+
+/* ---- Assistant message bubble ---- */
+[data-testid="stChatMessage"]:has(img[class*="stChatMessage"]),
+[data-testid="stChatMessage"]:not(:has([data-testid="stChatMessageAvatarUser"])) {
+    background: var(--white) !important;
+    border: 1px solid #E8E4DE !important;
+    box-shadow: 0 1px 6px rgba(27,42,74,0.05);
+}
+
+/* ===== Chat input ===== */
+[data-testid="stChatInput"] {
+    background: transparent !important;
+    border-top: none !important;
+    padding-top: 0.75rem !important;
+}
+[data-testid="stChatInput"] > div {
+    border-radius: 14px !important;
+    border: 2px solid #D6D0C6 !important;
+    background: var(--white) !important;
+    box-shadow: 0 2px 8px rgba(27,42,74,0.04) !important;
+    transition: all 0.25s ease;
+}
+[data-testid="stChatInput"] > div:focus-within {
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 0 3px rgba(201,168,76,0.12) !important;
+}
+[data-testid="stChatInput"] textarea {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.92rem !important;
+    color: var(--ink) !important;
+}
+[data-testid="stChatInput"] textarea::placeholder {
+    color: #A0A0A0 !important;
+    font-style: italic;
+}
+[data-testid="stChatInput"] button {
+    color: var(--gold) !important;
+}
+[data-testid="stChatInput"] button svg {
+    fill: var(--gold) !important;
+    stroke: var(--gold) !important;
+}
+
+/* ===== Suggestion / follow-up buttons ===== */
 .main .stButton > button {
     background: var(--white) !important;
-    border: 1.5px solid #E2E8F0 !important;
-    color: #1B2A4A !important;
-    border-radius: 10px;
+    border: 1.5px solid #DDD8CF !important;
+    color: var(--navy) !important;
+    border-radius: 12px;
     font-family: 'Inter', sans-serif;
-    font-size: 0.84rem;
+    font-size: 0.85rem;
     font-weight: 500;
-    padding: 0.6rem 1rem;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    padding: 0.7rem 1.1rem;
+    line-height: 1.45;
+    transition: all 0.25s ease;
+    box-shadow: 0 1px 3px rgba(27,42,74,0.04);
     text-align: left !important;
+    white-space: normal !important;
+    height: auto !important;
+    min-height: 2.8rem;
 }
 .main .stButton > button:hover {
-    border-color: #C9A84C !important;
-    color: #C9A84C !important;
-    box-shadow: 0 2px 8px rgba(201,168,76,0.12);
-    transform: translateY(-1px);
+    background: var(--gold-subtle) !important;
+    border-color: var(--gold) !important;
+    color: var(--navy) !important;
+    box-shadow: 0 3px 12px rgba(201,168,76,0.13);
+    transform: translateY(-2px);
+}
+.main .stButton > button:active {
+    transform: translateY(0px);
+    box-shadow: 0 1px 4px rgba(201,168,76,0.1);
 }
 
-/* Hero heading */
-.hero-heading {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.9rem;
-    font-weight: 600;
-    color: #1B2A4A;
-    text-align: center;
-    margin-bottom: 0.25rem;
-    line-height: 1.3;
-}
-.hero-sub {
-    font-family: 'Inter', sans-serif;
-    font-size: 1rem;
-    color: #64748B;
-    text-align: center;
-    margin-bottom: 2rem;
-    line-height: 1.6;
-    max-width: 560px;
-    margin-left: auto;
-    margin-right: auto;
-}
+/* ===== Hero / welcome state ===== */
 .hero-logo {
     display: block;
-    margin: 0 auto 1.25rem auto;
-    width: 200px;
+    margin: 1.5rem auto 1.25rem auto;
+    width: 190px;
+    opacity: 0.95;
 }
 .hero-divider {
-    width: 60px;
+    width: 56px;
     height: 3px;
-    background: linear-gradient(90deg, #C9A84C, #E8D48B);
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
     margin: 0 auto 1.5rem auto;
     border-radius: 2px;
 }
-
-/* Source chips */
-.source-chip {
-    display: inline-block;
-    background: #F1F5F9;
-    border: 1px solid #E2E8F0;
-    border-radius: 6px;
-    padding: 0.25rem 0.65rem;
-    margin: 0.15rem 0.25rem;
-    font-size: 0.78rem;
-    color: #475569;
+.hero-heading {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--navy);
+    text-align: center;
+    margin-bottom: 0.35rem;
+    line-height: 1.25;
+}
+.hero-sub {
     font-family: 'Inter', sans-serif;
+    font-size: 0.98rem;
+    color: var(--slate);
+    text-align: center;
+    margin-bottom: 2.2rem;
+    line-height: 1.65;
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
-/* Sidebar video list */
-.sidebar-video-item {
-    font-size: 0.82rem;
-    padding: 0.35rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    color: #94A3B8;
-}
-
-/* Section label */
+/* ===== Section labels ===== */
 .section-label {
     font-family: 'Inter', sans-serif;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #64748B;
+    letter-spacing: 0.12em;
+    color: var(--slate);
     font-weight: 600;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.85rem;
 }
-
-/* Followup section label */
 .followup-label {
     font-family: 'Inter', sans-serif;
-    font-size: 0.8rem;
-    color: #94A3B8;
-    font-weight: 500;
-    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--slate-light);
+    font-weight: 600;
+    margin-top: 0.5rem;
+    margin-bottom: 0.6rem;
 }
 
-/* Hide default Streamlit header/footer */
+/* ===== Source chips ===== */
+.source-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: linear-gradient(135deg, #F8F6F1, #F1EDE5);
+    border: 1px solid #E2DDD4;
+    border-radius: 8px;
+    padding: 0.3rem 0.75rem;
+    margin: 0.2rem 0.3rem 0.2rem 0;
+    font-size: 0.76rem;
+    color: var(--navy);
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+.source-chip::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: var(--gold);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ===== Sidebar video list ===== */
+.sidebar-video-item {
+    font-size: 0.8rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    color: #8B99AE;
+    line-height: 1.4;
+}
+
+/* ===== Hide default Streamlit chrome ===== */
 #MainMenu {visibility: hidden;}
 header {visibility: hidden;}
 footer {visibility: hidden;}
@@ -677,10 +758,10 @@ for msg_idx, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
         if msg.get("sources"):
-            chips_html = "".join(
-                f'<span class="source-chip">&#9654; {src["title"]}</span>'
+            chips_html = '<div style="margin-top:0.6rem;">' + "".join(
+                f'<span class="source-chip">{src["title"]}</span>'
                 for src in msg["sources"]
-            )
+            ) + '</div>'
             st.markdown(chips_html, unsafe_allow_html=True)
 
 # Show follow-up buttons only on the LAST assistant message
@@ -804,10 +885,10 @@ if prompt:
         response = st.write_stream(token_generator())
 
         if sources:
-            chips_html = "".join(
-                f'<span class="source-chip">&#9654; {src["title"]}</span>'
+            chips_html = '<div style="margin-top:0.6rem;">' + "".join(
+                f'<span class="source-chip">{src["title"]}</span>'
                 for src in sources
-            )
+            ) + '</div>'
             st.markdown(chips_html, unsafe_allow_html=True)
 
     followups = generate_followups(prompt, response)
