@@ -19,6 +19,10 @@ build/
 
 # Video files (too large for git)
 video_training/*.mp4
+video_training/.DS_Store
+
+# Raw VTT subtitle files (only clean .txt transcripts are needed)
+youtube_transcripts/_vtt_raw/
 
 # Cursor
 .cursor/

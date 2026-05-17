@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import tempfile
+from collections import defaultdict
 
 import chromadb
 import streamlit as st
@@ -30,6 +31,7 @@ OPENAI_API_KEY = (
 CHROMA_DIR = os.path.join(os.path.dirname(__file__), ".chroma_data")
 TRANSCRIPT_DIR = os.path.join(os.path.dirname(__file__), ".transcripts")
 VIDEO_DIR = os.path.join(os.path.dirname(__file__), "video_training")
+YOUTUBE_TRANSCRIPT_DIR = os.path.join(os.path.dirname(__file__), "youtube_transcripts")
 
 os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
 
@@ -86,7 +88,7 @@ def _clean_title(raw: str) -> str:
 
 
 def discover_videos() -> list[dict]:
-    """Find videos from mp4 files or cached transcripts."""
+    """Find videos from mp4 files, cached transcripts, or YouTube transcripts."""
     seen_ids = set()
     videos = []
 
@@ -102,7 +104,7 @@ def discover_videos() -> list[dict]:
             })
             seen_ids.add(filename)
 
-    # Second: discover from cached transcripts (for cloud deployment without video files)
+    # Second: discover from cached transcripts (.transcripts/)
     if os.path.isdir(TRANSCRIPT_DIR):
         for txt_path in sorted(glob.glob(os.path.join(TRANSCRIPT_DIR, "*.txt"))):
             txt_name = os.path.basename(txt_path)
@@ -113,6 +115,21 @@ def discover_videos() -> list[dict]:
                     "filename": video_id,
                     "title": _clean_title(video_id),
                     "video_id": video_id,
+                })
+                seen_ids.add(video_id)
+
+    # Third: discover from YouTube transcripts folder
+    if os.path.isdir(YOUTUBE_TRANSCRIPT_DIR):
+        for txt_path in sorted(glob.glob(os.path.join(YOUTUBE_TRANSCRIPT_DIR, "*.txt"))):
+            txt_name = os.path.basename(txt_path)
+            video_id = txt_name[:-4] if txt_name.endswith(".txt") else txt_name
+            if video_id not in seen_ids:
+                videos.append({
+                    "filepath": None,
+                    "filename": video_id,
+                    "title": _clean_title(video_id),
+                    "video_id": video_id,
+                    "transcript_path": txt_path,
                 })
                 seen_ids.add(video_id)
 
@@ -134,8 +151,24 @@ def extract_audio(video_path: str, output_path: str) -> bool:
         return False
 
 
+def _filter_primary_speaker(segments) -> str:
+    """Keep only the dominant speaker (Tiffany) from diarized segments."""
+    if not segments:
+        return ""
+    duration_by_speaker = defaultdict(float)
+    for seg in segments:
+        duration_by_speaker[seg.speaker] += (seg.end - seg.start)
+    primary = max(duration_by_speaker, key=duration_by_speaker.get)
+    return "\n\n".join(seg.text.strip() for seg in segments if seg.speaker == primary and seg.text.strip())
+
+
 def transcribe_video(video: dict) -> str | None:
-    """Transcribe a video file. Returns full transcript text, cached locally."""
+    """Return transcript text. Checks pre-existing transcript files first, then Whisper."""
+    # Check for pre-existing YouTube transcript
+    if video.get("transcript_path") and os.path.exists(video["transcript_path"]):
+        with open(video["transcript_path"], "r", encoding="utf-8") as f:
+            return f.read()
+
     cache_file = os.path.join(TRANSCRIPT_DIR, video["filename"] + ".txt")
 
     if os.path.exists(cache_file):
@@ -156,20 +189,24 @@ def transcribe_video(video: dict) -> str | None:
 
         file_size = os.path.getsize(tmp_path)
         if file_size > 24 * 1024 * 1024:
-            # Split into ~20MB chunks for very long videos
             return _transcribe_large_audio(tmp_path, video, cache_file)
 
         with open(tmp_path, "rb") as audio_file:
             result = client.audio.transcriptions.create(
-                model="whisper-1",
+                model="gpt-4o-transcribe-diarize",
                 file=audio_file,
-                response_format="text",
+                response_format="diarized_json",
+                chunking_strategy="auto",
             )
 
-        with open(cache_file, "w") as f:
-            f.write(result)
+        text = _filter_primary_speaker(result.segments)
+        if not text:
+            text = result.text or ""
 
-        return result
+        with open(cache_file, "w") as f:
+            f.write(text)
+
+        return text
 
     except Exception as e:
         st.warning(f"Transcription failed for {video['title']}: {e}")
@@ -180,25 +217,23 @@ def transcribe_video(video: dict) -> str | None:
 
 
 def _transcribe_large_audio(audio_path: str, video: dict, cache_file: str) -> str | None:
-    """Split a large audio file into segments and transcribe each."""
+    """Split a large audio file into segments, transcribe with diarization, keep primary speaker."""
+    import re
     ffmpeg = get_ffmpeg_path()
     client = get_openai_client()
-    parts = []
+    all_segments = []
     segment_dur = 600  # 10-minute segments
 
-    # Get duration
     try:
         probe = subprocess.run(
             [ffmpeg, "-i", audio_path, "-f", "null", "-"],
             capture_output=True, text=True, timeout=30,
         )
-        # Parse duration from ffmpeg stderr
-        import re
         match = re.search(r"Duration: (\d+):(\d+):(\d+)", probe.stderr)
         if match:
             total_secs = int(match.group(1)) * 3600 + int(match.group(2)) * 60 + int(match.group(3))
         else:
-            total_secs = 1800  # default 30 min
+            total_secs = 1800
     except Exception:
         total_secs = 1800
 
@@ -210,35 +245,113 @@ def _transcribe_large_audio(audio_path: str, video: dict, cache_file: str) -> st
             subprocess.run(
                 [ffmpeg, "-i", audio_path, "-ss", str(start), "-t", str(segment_dur),
                  "-acodec", "libmp3lame", "-ab", "64k", "-ar", "16000", "-ac", "1", "-y", seg_path],
-                capture_output=True, check=True, timeout=60,
+                capture_output=True, check=True, timeout=120,
             )
 
             with open(seg_path, "rb") as f:
                 result = client.audio.transcriptions.create(
-                    model="whisper-1", file=f, response_format="text",
+                    model="gpt-4o-transcribe-diarize",
+                    file=f,
+                    response_format="diarized_json",
+                    chunking_strategy="auto",
                 )
-            parts.append(result)
+            if result.segments:
+                all_segments.extend(result.segments)
         except Exception as e:
             st.warning(f"Segment transcription failed: {e}")
         finally:
             if os.path.exists(seg_path):
                 os.unlink(seg_path)
 
-    if not parts:
+    if not all_segments:
         return None
 
-    full_text = "\n\n".join(parts)
-    with open(cache_file, "w") as f:
-        f.write(full_text)
+    text = _filter_primary_speaker(all_segments)
+    if not text:
+        text = "\n\n".join(seg.text for seg in all_segments if seg.text.strip())
 
-    return full_text
+    with open(cache_file, "w") as f:
+        f.write(text)
+
+    return text
 
 
 # ---------------------------------------------------------------------------
 # Ingestion
 # ---------------------------------------------------------------------------
 
+def ingest_videos_silent():
+    """Ingest all videos into ChromaDB. No UI elements — runs at startup."""
+    collection = get_chroma_collection()
+    client = get_openai_client()
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500, chunk_overlap=50, separators=["\n\n", "\n", ". ", " ", ""]
+    )
+
+    videos = discover_videos()
+    total = len(videos)
+    if total == 0:
+        return {"ingested": 0, "skipped": 0, "failed": 0, "total": 0}
+
+    existing_ids = set()
+    try:
+        existing = collection.get()
+        if existing and existing["metadatas"]:
+            existing_ids = {m.get("video_id") for m in existing["metadatas"]}
+    except Exception:
+        pass
+
+    ingested, skipped, failed = 0, 0, 0
+
+    for i, video in enumerate(videos):
+        if video["video_id"] in existing_ids:
+            skipped += 1
+            continue
+
+        transcript = transcribe_video(video)
+        if not transcript:
+            failed += 1
+            continue
+
+        chunks = splitter.split_text(transcript)
+        if not chunks:
+            failed += 1
+            continue
+
+        for batch_start in range(0, len(chunks), 50):
+            batch = chunks[batch_start : batch_start + 50]
+            resp = client.embeddings.create(model="text-embedding-3-small", input=batch)
+            embeddings = [item.embedding for item in resp.data]
+            ids = [f"{video['video_id']}_{batch_start + j}" for j in range(len(batch))]
+            metadatas = [
+                {
+                    "video_id": video["video_id"],
+                    "title": video["title"],
+                    "start_time": 0.0,
+                    "end_time": 0.0,
+                    "thumbnail_url": "",
+                }
+                for _ in batch
+            ]
+            collection.upsert(
+                ids=ids, documents=batch, embeddings=embeddings, metadatas=metadatas,
+            )
+
+        ingested += 1
+
+    return {"ingested": ingested, "skipped": skipped, "failed": failed, "total": total}
+
+
+@st.cache_resource(show_spinner="Preparing knowledge base — this only happens once...")
+def ensure_knowledge_base():
+    """Run ingestion once at startup, cached across reruns."""
+    if not OPENAI_API_KEY:
+        return None
+    return ingest_videos_silent()
+
+
 def ingest_videos(progress_bar, status_text):
+    """UI-aware ingestion for manual re-index button."""
     collection = get_chroma_collection()
     client = get_openai_client()
     splitter = RecursiveCharacterTextSplitter(
@@ -668,6 +781,9 @@ footer {visibility: hidden;}
 """, unsafe_allow_html=True)
 
 
+# ---- Startup: ensure knowledge base is ready before UI ----
+startup_result = ensure_knowledge_base()
+
 # ---- Sidebar ----
 with st.sidebar:
     st.image(LOGO_WHITE, width=180)
@@ -689,18 +805,7 @@ with st.sidebar:
     with col2:
         st.metric("Videos", f"{len(local_videos)}")
 
-    if count == 0 and OPENAI_API_KEY and len(local_videos) > 0:
-        st.info("Preparing knowledge base...")
-        bar = st.progress(0, text="Starting...")
-        status = st.empty()
-        result = ingest_videos(bar, status)
-        status.text("")
-        st.success(
-            f"Ready! Ingested **{result['ingested']}** videos, "
-            f"skipped {result['skipped']}, failed {result['failed']}."
-        )
-        st.rerun()
-    elif count == 0 and not OPENAI_API_KEY:
+    if count == 0 and not OPENAI_API_KEY:
         st.error("Set OPENAI_API_KEY in your .env file (local) or Streamlit Secrets (cloud).")
     elif count == 0 and len(local_videos) == 0:
         st.warning("No videos or transcripts found.")
