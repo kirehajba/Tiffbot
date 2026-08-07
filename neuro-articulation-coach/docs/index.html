@@ -831,6 +831,205 @@ async function coachMeetingAnswer(i) {
 window.buildCircuit = buildCircuit;
 window.coachMeetingAnswer = coachMeetingAnswer;
 
+/* ------------------------------ Mock interview ------------------------------ */
+const IV_SENIORITIES = ["Individual contributor", "Manager", "Director", "VP / Executive"];
+const IV_STYLES = ["Friendly", "Neutral", "Tough"];
+const IV_CANNED_QUESTIONS = [
+  "Tell me about yourself and why this role.",
+  "Describe the project you're most proud of. What was YOUR specific contribution?",
+  "Tell me about a time you disagreed with a decision above you. What did you do?",
+  "This role demands strong stakeholder communication — walk me through a moment you influenced without authority.",
+  "If we hired you, what would worry you most about your first 90 days?",
+];
+
+function getAnswers() {
+  try { return JSON.parse(localStorage.getItem("ns_answers")) || []; } catch (e) { return []; }
+}
+function setAnswers(a) { localStorage.setItem("ns_answers", JSON.stringify(a)); }
+
+async function fetchInterviewQuestions(setup) {
+  const key = requireKey();
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      response_format: { type: "json_object" },
+      temperature: 0.7, max_tokens: 500,
+      messages: [{ role: "user", content:
+        `Generate a realistic job-interview question set.\n` +
+        `Role: ${setup.role}\nSeniority: ${setup.seniority}\nInterviewer style: ${setup.style}\n` +
+        (setup.jd ? `Job description:\n${setup.jd.slice(0, 3000)}\n` : "") +
+        `\nReturn JSON: {"questions": [exactly 5 strings]} — mix 2 behavioral, ` +
+        `${setup.jd ? "2 tailored directly to specific requirements in the job description" : "2 tailored to the role"}, ` +
+        `and 1 unexpected curveball. Phrase them the way a real ${setup.style.toLowerCase()} interviewer would speak.` }],
+    }),
+  });
+  if (!r.ok) throw new Error(`Question generation failed (${r.status})`);
+  return JSON.parse((await r.json()).choices[0].message.content);
+}
+
+async function fetchFollowup(question, answer) {
+  const key = requireKey();
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini", temperature: 0.6, max_tokens: 80,
+      messages: [{ role: "user", content:
+        `You are the interviewer. You asked: "${question}"\nThe candidate answered:\n"${answer.slice(0, 1500)}"\n\n` +
+        `If the answer left something vague, unproven, or unquantified, return ONLY one probing follow-up question (one sentence). ` +
+        `If the answer was genuinely complete, return exactly: NONE` }],
+    }),
+  });
+  if (!r.ok) return null;
+  const text = (await r.json()).choices[0].message.content.trim();
+  return /^NONE\b/i.test(text) ? null : text;
+}
+
+async function ivStart() {
+  const role = $("iv_role").value.trim();
+  if (!role) return showMsg("interview", "warn", "Enter the role you're interviewing for.");
+  const setup = {
+    role,
+    seniority: $("iv_seniority").value,
+    style: $("iv_style").value,
+    jd: $("iv_jd").value.trim(),
+  };
+  const btn = $("iv_start");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Preparing your interviewer...';
+  try {
+    let questions;
+    if (PREVIEW) {
+      await new Promise(r => setTimeout(r, 800));
+      questions = IV_CANNED_QUESTIONS;
+    } else {
+      questions = (await fetchInterviewQuestions(setup)).questions;
+    }
+    window._iv = {
+      setup,
+      queue: questions.map(t => ({ text: t, followup: false })),
+      idx: 0, results: [], phase: "active", answered: false, lastFb: null,
+    };
+    renderMain();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Start interview";
+    showMsg("interview", "err", e.message);
+  }
+}
+
+async function ivAnswer() {
+  const iv = window._iv;
+  const q = iv.queue[iv.idx];
+  let text = $("iv_input").value.trim();
+  const R = recorders.interview;
+  if (!text && R?.blob) {
+    if (PREVIEW) return showMsg("interview", "warn", "Voice transcription needs the live app — type your answer in this preview.");
+    setBusy("interview", true, "Transcribing...");
+    try { text = await transcribe(R.blob); }
+    catch (e) { setBusy("interview", false); return showMsg("interview", "err", e.message); }
+    delete recorders.interview;
+  }
+  if (!text) return showMsg("interview", "warn", "Record or type your answer first.");
+  setBusy("interview", true, "The interviewer is taking notes...");
+  try {
+    const fb = await getFeedback(
+      "Job interview answer",
+      `Interview for ${iv.setup.role} (${iv.setup.seniority}). ${q.followup ? "Follow-up question" : "Question"}: ${q.text}`,
+      text,
+      `Judge as a ${iv.setup.style.toLowerCase()} hiring interviewer would. ` +
+      (iv.setup.jd ? `Weigh fit against this job description: ${iv.setup.jd.slice(0, 1200)}. ` : "") +
+      `Reward specifics, ownership ("I" not "we"), and quantified results.`,
+    );
+    const nums = Object.values(fb.scores || {}).filter(v => typeof v === "number");
+    iv.results.push({
+      q: q.text, answer: text,
+      scores: fb.scores || {},
+      overall: nums.length ? +(nums.reduce((a, b) => a + b) / nums.length).toFixed(1) : 0,
+      upgraded: fb.upgraded_version || "",
+      fixes: (fb.improvements || []).map(i => typeof i === "string" ? i : i.advice).filter(Boolean),
+    });
+    if (!PREVIEW && !q.followup) {
+      try {
+        const fu = await fetchFollowup(q.text, text);
+        if (fu) iv.queue.splice(iv.idx + 1, 0, { text: fu, followup: true });
+      } catch (e) { /* follow-up is best-effort */ }
+    }
+    iv.answered = true; iv.lastFb = fb;
+    renderMain();
+    renderFeedback("interview", "interview", fb);
+  } catch (e) { showMsg("interview", "err", e.message); }
+  finally { const b = $("go_interview"); if (b) { b.disabled = false; b.innerHTML = b.dataset.label; } }
+}
+
+function ivNext() {
+  const iv = window._iv;
+  iv.idx++; iv.answered = false; iv.lastFb = null;
+  if (iv.idx >= iv.queue.length) {
+    iv.phase = "report";
+    const saved = getAnswers();
+    for (const r of iv.results) {
+      saved.push({ date: todayStr(), role: iv.setup.role, q: r.q, answer: r.answer, upgraded: r.upgraded, overall: r.overall });
+    }
+    setAnswers(saved);
+  }
+  renderMain();
+}
+window.ivStart = ivStart; window.ivAnswer = ivAnswer; window.ivNext = ivNext;
+
+/* ------------------------------ Text-to-speech ------------------------------ */
+async function hearIt(id) {
+  const text = (window._speakCache || {})[id];
+  if (!text) return;
+  try {
+    const key = requireKey();
+    const r = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-4o-mini-tts", voice: "nova", input: text.slice(0, 2000) }),
+    });
+    if (!r.ok) throw new Error(`Speech failed (${r.status})`);
+    new Audio(URL.createObjectURL(await r.blob())).play();
+  } catch (e) { alert(e.message); }
+}
+window.hearIt = hearIt;
+
+/* ------------------------------ Progress export / import ------------------------------ */
+function exportProgress() {
+  const data = {
+    history: store.history,
+    answers: getAnswers(),
+    meeting: JSON.parse(localStorage.getItem("ns_meeting") || "null"),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "neurospeak-progress.json";
+  a.click();
+}
+function importProgress(ev) {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(reader.result);
+      if (Array.isArray(d.history)) localStorage.setItem("ns_history", JSON.stringify(d.history));
+      if (Array.isArray(d.answers)) setAnswers(d.answers);
+      if (d.meeting) localStorage.setItem("ns_meeting", JSON.stringify(d.meeting));
+      renderStreak(); renderMain();
+    } catch (e) { alert("That doesn't look like a NeuroSpeak progress file."); }
+  };
+  reader.readAsText(f);
+}
+function deleteAnswer(i) {
+  const a = getAnswers();
+  a.splice(i, 1);
+  setAnswers(a);
+  renderMain();
+}
+window.exportProgress = exportProgress; window.importProgress = importProgress; window.deleteAnswer = deleteAnswer;
+
 /* ------------------------------ Countdown timer ------------------------------ */
 let _timerInt = null;
 function startTimer(id, secs) {
@@ -924,7 +1123,14 @@ function renderFeedback(id, drill, fb, prefixHtml = "") {
       return `<li>🎯 ${esc(s.advice || "")}${s.example ? `<div class="advice-example">✏️ ${esc(s.example)}</div>` : ""}</li>`;
     }).join("") + `</ul>`;
   }
-  if (fb.upgraded_version) html += `<h4>How I'd say it</h4><div class="upgraded">${esc(fb.upgraded_version)}</div>`;
+  if (fb.upgraded_version) {
+    html += `<h4>How I'd say it</h4><div class="upgraded">${esc(fb.upgraded_version)}</div>`;
+    if (!PREVIEW) {
+      window._speakCache = window._speakCache || {};
+      window._speakCache[id] = fb.upgraded_version;
+      html += `<div class="row"><button class="btn btn-ghost" onclick="hearIt('${id}')">🔊 Hear it spoken</button></div>`;
+    }
+  }
   else if (PREVIEW) html += `<h4>How I'd say it</h4><div class="upgraded"><em>Your text is already clean on the mechanical signals this preview can measure. The deployed app always rewrites your answer with GPT-4o — for meaning, flow, and impact, not just mechanics.</em></div>`;
   if (fb.coach_note) html += `<div class="coachnote">💬 ${esc(fb.coach_note)}</div>`;
   html += `</div>`;
@@ -935,8 +1141,9 @@ function renderFeedback(id, drill, fb, prefixHtml = "") {
 /* ------------------------------ Tabs ------------------------------ */
 const TABS = [
   ["warmup", "🔥 Warm-Up"], ["impromptu", "🎤 Impromptu"], ["roleplay", "🎭 Roleplay"],
-  ["meeting", "🎯 My Meeting"], ["precision", "✂️ Precision"], ["structure", "🏗️ Structure"],
-  ["vocab", "📚 Vocabulary"], ["progress", "📈 Progress"],
+  ["interview", "💼 Interview"], ["meeting", "🎯 My Meeting"], ["precision", "✂️ Precision"],
+  ["structure", "🏗️ Structure"], ["vocab", "📚 Vocabulary"], ["answers", "📇 Answers"],
+  ["progress", "📈 Progress"],
 ];
 let activeTab = "warmup";
 function renderTabs() {
@@ -1086,6 +1293,78 @@ function renderMain() {
         <div id="out_meeting"></div>
       </div>`;
     }
+  } else if (activeTab === "interview") {
+    const iv = window._iv;
+    if (!iv || iv.phase === "setup") {
+      m.innerHTML = `<div class="card">
+        <p><strong>A full mock interview, built for the job you actually want.</strong> Tailored questions (paste the job description for best results), an interviewer who asks follow-ups, per-answer coaching, and a final report card. Your answers get saved to 📇 Answers.</p>
+        <details class="neuro"><summary>🧠 Why this works</summary><div><strong>Context-matched retrieval + stress inoculation.</strong> Rehearsing the real questions, under mild pressure, with immediate feedback is the closest thing to the actual interview your brain can train on — and transfer tracks similarity.</div></details>
+        <label class="fieldlabel">Role you're interviewing for</label>
+        <input type="text" id="iv_role" placeholder="e.g. VP of AI Transformation">
+        <div class="row">
+          <div style="flex:1"><label class="fieldlabel">Seniority</label>
+            <select id="iv_seniority" style="width:100%;padding:0.6rem;border-radius:10px;border:1.5px solid var(--card-border)">${IV_SENIORITIES.map(s => `<option>${s}</option>`).join("")}</select></div>
+          <div style="flex:1"><label class="fieldlabel">Interviewer style</label>
+            <select id="iv_style" style="width:100%;padding:0.6rem;border-radius:10px;border:1.5px solid var(--card-border)">${IV_STYLES.map(s => `<option${s === "Neutral" ? " selected" : ""}>${s}</option>`).join("")}</select></div>
+        </div>
+        <label class="fieldlabel">Job description (optional, recommended)</label>
+        <textarea id="iv_jd" placeholder="Paste the job posting here — questions get tailored to its exact requirements."></textarea>
+        <div class="row"><button class="btn btn-primary" id="iv_start" onclick="ivStart()">Start interview</button></div>
+        <div id="out_interview"></div>
+      </div>`;
+    } else if (iv.phase === "active") {
+      const q = iv.queue[iv.idx];
+      m.innerHTML = `<div class="card">
+        <div class="row" style="justify-content:space-between">
+          <strong>💼 ${esc(iv.setup.role)}</strong>
+          <span class="hint">Question ${iv.idx + 1} of ${iv.queue.length}</span>
+        </div>
+        <div class="exercise">${q.followup ? "↳ <em>Follow-up:</em> " : "❓ "}<strong>${esc(q.text)}</strong></div>
+        ${iv.answered ? "" : `
+          ${recorderRow("interview", "Record your answer")}
+          <textarea id="iv_input" placeholder="...or type your answer. Speak out loud even if you type — the rep is in the speaking."></textarea>
+          <div class="row"><button class="btn btn-primary" id="go_interview" data-label="Submit answer" onclick="ivAnswer()">Submit answer</button>
+            <button class="btn btn-ghost" onclick="window._iv=null;renderMain()">✕ Abandon interview</button></div>`}
+        <div id="out_interview"></div>
+        ${iv.answered ? `<div class="row" style="margin-top:0.6rem"><button class="btn btn-primary" onclick="ivNext()">${iv.idx + 1 >= iv.queue.length ? "🏁 Finish & see report" : "Next question ▸"}</button></div>` : ""}
+      </div>`;
+    } else {
+      const per = {};
+      SKILLS.forEach(s => per[s] = []);
+      iv.results.forEach(r => SKILLS.forEach(s => { if (typeof r.scores[s] === "number") per[s].push(r.scores[s]); }));
+      const avgs = Object.fromEntries(Object.entries(per).filter(([, v]) => v.length).map(([k, v]) => [k, +(v.reduce((a, b) => a + b) / v.length).toFixed(1)]));
+      const overall = iv.results.length ? +(iv.results.reduce((a, r) => a + r.overall, 0) / iv.results.length).toFixed(1) : 0;
+      const verdict = overall >= 8 ? ["Strong hire", "ok"] : overall >= 6.5 ? ["Hire", "ok"] : overall >= 5 ? ["Borderline — close, not yet convincing", "warn"] : ["Not yet — keep drilling", "err"];
+      const weakest = [...iv.results].sort((a, b) => a.overall - b.overall);
+      const fixes = [...new Set(weakest.flatMap(r => r.fixes.slice(0, 1)))].slice(0, 3);
+      m.innerHTML = `<div class="card">
+        <div class="row" style="justify-content:space-between"><strong>📋 Interview report — ${esc(iv.setup.role)}</strong>
+          <button class="btn btn-ghost" onclick="window._iv=null;renderMain()">↩ New interview</button></div>
+        <div class="alert ${verdict[1]}"><strong>Panel verdict: ${verdict[0]}</strong> — overall ${overall}/10 across ${iv.results.length} answers.</div>
+        <div class="pgrid">${Object.entries(avgs).map(([k, v]) => `<div class="score"><div class="lab">${k}</div><div class="val">${v}/10</div></div>`).join("")}</div>
+        ${fixes.length ? `<h4 style="font-size:0.9rem">Top fixes before the real thing</h4><ul>${fixes.map(f => `<li>🎯 ${esc(f)}</li>`).join("")}</ul>` : ""}
+        <h4 style="font-size:0.9rem;margin-top:0.8rem">Question by question</h4>
+        ${iv.results.map(r => `<details class="neuro"><summary>${r.overall}/10 — ${esc(r.q)}</summary><div>
+          <p><strong>You said:</strong> ${esc(r.answer)}</p>
+          ${r.upgraded ? `<div class="upgraded">${esc(r.upgraded)}</div>` : ""}</div></details>`).join("")}
+        <p class="hint" style="margin-top:0.6rem">✅ All answers saved to 📇 Answers — your personal STAR bank for the real interview.</p>
+      </div>`;
+    }
+  } else if (activeTab === "answers") {
+    const answers = getAnswers();
+    if (!answers.length) {
+      m.innerHTML = `<div class="card"><p><strong>📇 Your answer bank is empty.</strong> Finish a 💼 mock interview and your answers — plus their upgraded versions — get saved here automatically. Before a real interview, reread your bank: retrieval of your own polished stories is the highest-yield 20 minutes of prep there is.</p></div>`;
+    } else {
+      m.innerHTML = `<div class="card">
+        <p><strong>📇 Your answer bank</strong> — ${answers.length} saved answer${answers.length !== 1 ? "s" : ""}. Reread before real interviews; practice the weak ones again in 💼 Interview.</p>
+        ${answers.map((a, i) => `<details class="neuro"><summary>${a.overall}/10 · ${esc(a.role || "")} — ${esc(a.q)}</summary><div>
+          <p class="hint">${a.date}</p>
+          <p><strong>Your answer:</strong> ${esc(a.answer)}</p>
+          ${a.upgraded ? `<div class="upgraded">${esc(a.upgraded)}</div>` : ""}
+          <div class="row"><button class="btn btn-ghost" onclick="deleteAnswer(${i})">🗑 Delete</button></div>
+        </div></details>`).reverse().join("")}
+      </div>`;
+    }
   } else {
     renderProgress(m);
   }
@@ -1205,7 +1484,9 @@ function renderProgress(m) {
   const h = store.history;
   if (!h.length) {
     m.innerHTML = `<div class="card"><p>No drills completed yet. Your progress will show up here —
-      <strong>consistency beats intensity</strong>, so aim for one drill a day.</p></div>`;
+      <strong>consistency beats intensity</strong>, so aim for one drill a day.</p>
+      <div class="row"><button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">⬆️ Import progress from another device</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProgress(event)"></div></div>`;
     return;
   }
   const streak = computeStreak(h);
@@ -1258,7 +1539,13 @@ function renderProgress(m) {
     <h4 style="margin:1rem 0 0.3rem;font-size:0.85rem">Recent drills</h4>
     <table class="hist"><tr><th>Date</th><th>Drill</th><th>Score</th></tr>
       ${h.slice(-10).reverse().map(x => `<tr><td>${x.date}</td><td>${x.drill}</td><td>${x.overall}/10</td></tr>`).join("")}</table>
-    <div class="row" style="margin-top:0.8rem"><button class="btn btn-ghost" onclick="if(confirm('Delete all progress?')){localStorage.removeItem('ns_history');renderStreak();renderMain();}">Reset progress</button></div>
+    <div class="row" style="margin-top:0.8rem">
+      <button class="btn btn-ghost" onclick="exportProgress()">⬇️ Export progress</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">⬆️ Import progress</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProgress(event)">
+      <button class="btn btn-ghost" onclick="if(confirm('Delete all progress?')){localStorage.removeItem('ns_history');renderStreak();renderMain();}">Reset progress</button>
+    </div>
+    <p class="hint">Export moves your streak, scores, and answer bank to another device — import the file there.</p>
   </div>`;
 }
 
