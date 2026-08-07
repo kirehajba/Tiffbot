@@ -103,6 +103,10 @@ label.fieldlabel { font-size: 0.8rem; font-weight: 600; color: var(--slate); }
   padding: 0.8rem 1rem; font-size: 0.9rem; margin: 0.5rem 0;
 }
 .coachnote { font-style: italic; color: var(--slate); font-size: 0.88rem; border-left: 3px solid var(--violet); padding-left: 0.8rem; margin: 0.7rem 0; }
+.scorewhy { background: #FAFAFE; border: 1px solid var(--card-border); border-radius: 12px; padding: 0.7rem 0.9rem; margin: 0.5rem 0; font-size: 0.87rem; }
+.scorewhy-head { font-weight: 700; color: var(--indigo); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.2rem; }
+.toten { background: #ECFDF5; border-left: 3px solid var(--mint); border-radius: 0 8px 8px 0; padding: 0.4rem 0.7rem; margin-top: 0.4rem; }
+.advice-example { background: #F5F3FF; border-radius: 8px; padding: 0.4rem 0.7rem; margin: 0.3rem 0 0.2rem; font-size: 0.85rem; color: var(--ink); }
 .ideasbox { background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 12px; padding: 0.8rem 1rem; margin: 0.6rem 0; font-size: 0.88rem; }
 .ideasbox h4 { font-size: 0.8rem; margin: 0.5rem 0 0.2rem; }
 .ideasbox ul { padding-left: 1.2rem; }
@@ -294,8 +298,13 @@ const SYSTEM_PROMPT = `You are an elite executive communication coach with decad
 
 You MUST respond with a single JSON object with exactly these keys:
 - "scores": object with integer scores 1-10 for "clarity", "concision", "structure", "impact"
-- "strengths": array of 1-3 short strings — what genuinely worked
-- "improvements": array of 1-3 short strings — the highest-leverage fixes
+- "score_explanations": object with one entry per skill ("clarity", "concision", "structure", "impact"), each an object with:
+    - "why": 1-2 sentences explaining THIS specific score, quoting the exact words or phrases from the client's response that earned or cost points
+    - "to_ten": what would make this dimension 10/10, ending with a concrete example sentence the client could actually have said
+- "strengths": array of 1-3 short strings — what genuinely worked, each quoting the client's actual words
+- "improvements": array of 1-3 objects, each with:
+    - "advice": the highest-leverage fix, stated plainly
+    - "example": a concrete before → after built from the client's own answer — quote their phrase, then show the improved phrase (format: “their words” → “better words”)
 - "upgraded_version": string — your rewritten, stronger version of their response (same length or shorter)
 - "coach_note": string — 1-2 encouraging sentences in your voice, referencing neuroplasticity when natural
 
@@ -379,7 +388,7 @@ async function getFeedback(drill, task, response, extra) {
     body: JSON.stringify({
       model: "gpt-4o",
       messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: user }],
-      response_format: { type: "json_object" }, temperature: 0.5, max_tokens: 900,
+      response_format: { type: "json_object" }, temperature: 0.5, max_tokens: 1600,
     }),
   });
   if (!r.ok) throw new Error(`Feedback failed (${r.status}): ${(await r.text()).slice(0, 200)}`);
@@ -460,19 +469,66 @@ function localCoach(drill, text) {
   if (a.words <= 30) strengths.push(`Tight length — ${a.words} words holds attention`);
   if (a.sentences > 0 && a.avgLen <= 18) strengths.push(`Digestible sentences (avg ${a.avgLen} words)`);
   if (!a.fillers) strengths.push("No filler words — clean delivery");
-  if (a.found.length) improvements.push(`Cut the verbose phrases: ${a.found.map(f => `“${f}”`).join(", ")}`);
-  if (a.hedges.length) improvements.push(`Hedges dilute authority: ${a.hedges.map(h => `“${h}”`).join(", ")}`);
-  if (a.fillers) improvements.push(`${a.fillers} filler word${a.fillers > 1 ? "s" : ""} — pause silently instead`);
-  if (a.avgLen > 22) improvements.push(`Average sentence runs ${a.avgLen} words — split it up for punch`);
+  if (a.found.length) {
+    const first = VERBOSE.find(v => v[0] === a.found[0]);
+    improvements.push({
+      advice: `Cut the verbose phrases: ${a.found.map(f => `“${f}”`).join(", ")}`,
+      example: `“${a.found[0]}” → ${first && first[1] ? `“${first[1]}”` : "delete it entirely"}`,
+    });
+  }
+  if (a.hedges.length) improvements.push({
+    advice: `Hedges dilute authority: ${a.hedges.map(h => `“${h}”`).join(", ")}`,
+    example: `“I think we should maybe start now” → “We start now.”`,
+  });
+  if (a.fillers) improvements.push({
+    advice: `${a.fillers} filler word${a.fillers > 1 ? "s" : ""} — pause silently instead`,
+    example: `“Um, so, basically the plan is…” → (breath) “The plan is…”`,
+  });
+  if (a.avgLen > 22) improvements.push({
+    advice: `Average sentence runs ${a.avgLen} words — split it up for punch`,
+    example: `One idea per sentence: “We tested it. It worked. We should scale it.”`,
+  });
   if (!strengths.length) strengths.push("You got the rep in — that's what rewires the circuit");
-  if (!improvements.length) improvements.push("Clean on every measurable signal — the live AI coach digs into meaning and persuasion");
+  if (!improvements.length) improvements.push({
+    advice: "Clean on every measurable signal — the live AI coach digs into meaning and persuasion",
+    example: "Deploy the app and re-run this drill for GPT-4o coaching on your exact words.",
+  });
   const concision = Math.max(3, 9 - a.found.length - Math.min(3, a.fillers) - a.hedges.length);
   const clarity = a.avgLen <= 14 ? 9 : a.avgLen <= 20 ? 8 : a.avgLen <= 26 ? 6 : 4;
   const structure = a.sentences >= 2 && a.sentences <= 6 ? 8 : 5;
   const impact = Math.max(3, Math.round((concision + clarity) / 2) - (a.hedges.length ? 1 : 0));
   const changed = normWords(a.rewrite).join(" ") !== normWords(text).join(" ");
+  const score_explanations = {
+    clarity: {
+      why: a.sentences
+        ? `Your ${a.sentences} sentence${a.sentences > 1 ? "s" : ""} average ${a.avgLen} words — ${a.avgLen <= 18 ? "digestible for a listener." : "long enough that listeners lose the thread."}`
+        : `One unbroken stream of ${a.words} words gives the listener nowhere to breathe.`,
+      to_ten: `Keep sentences under ~16 words, one idea each — e.g. “The project slipped. The launch is at risk. I need a decision Friday.”`,
+    },
+    concision: {
+      why: (a.found.length || a.fillers)
+        ? `Detected: ${[a.found.length ? `verbose phrases (${a.found.map(f => `“${f}”`).join(", ")})` : "", a.fillers ? `${a.fillers} filler word${a.fillers > 1 ? "s" : ""}` : ""].filter(Boolean).join(" and ")}.`
+        : `No verbose phrases or fillers detected in your ${a.words} words.`,
+      to_ten: `Every word earns its place — e.g. “due to the fact that” → “because”.`,
+    },
+    structure: {
+      why: a.sentences >= 2 && a.sentences <= 6
+        ? `${a.sentences} sentences give the answer a visible beginning, middle, and end.`
+        : (a.sentences < 2
+          ? `A single run-on sentence has no structure a listener can follow.`
+          : `${a.sentences} sentences without a clear frame tend to wander.`),
+      to_ten: `Use an explicit frame like PREP — Point (“Yes — fund it”), Reason (“it pays back in 3 months”), Example (“team X saved 10 hours/week”), Point again (“so I'm asking for a yes”).`,
+    },
+    impact: {
+      why: a.hedges.length
+        ? `Hedging (${a.hedges.map(h => `“${h}”`).join(", ")}) softens your authority exactly where you need it most.`
+        : `No hedges — your statements land as statements.`,
+      to_ten: `End on the ask, not a trailing thought — e.g. “I'm asking for a yes today.”`,
+    },
+  };
   return {
     scores: { clarity, concision, structure, impact },
+    score_explanations,
     strengths: strengths.slice(0, 3),
     improvements: improvements.slice(0, 3),
     upgraded_version: changed ? a.rewrite : "",
@@ -649,8 +705,19 @@ async function fetchPersonaReply(rp) {
 async function sendRoleplay() {
   const rp = window._rp;
   if (!rp) return;
-  const text = $("rp_input").value.trim();
-  if (!text) return;
+  let text = $("rp_input").value.trim();
+  const R = recorders.roleplay;
+  if (!text && R?.blob) {
+    if (PREVIEW) return showMsg("roleplay", "warn", "Voice transcription needs the live app — type your reply in this preview.");
+    rp.waiting = true;
+    renderMain();
+    try { text = await transcribe(R.blob); }
+    catch (e) { rp.waiting = false; renderMain(); return showMsg("roleplay", "err", e.message); }
+    rp.waiting = false;
+    delete recorders.roleplay;
+  }
+  if (!text) return showMsg("roleplay", "warn", "Record or type a reply first.");
+  delete recorders.roleplay;
   rp.msgs.push({ who: "you", text });
   rp.waiting = true;
   renderMain();
@@ -837,8 +904,26 @@ function renderFeedback(id, drill, fb, prefixHtml = "") {
   const overall = nums.length ? nums.reduce((a, b) => a + b) / nums.length : null;
   let html = prefixHtml + `<div class="scores">` + SKILLS.map(s =>
     `<div class="score"><div class="lab">${s}</div><div class="val">${scores[s] ?? "—"}/10</div></div>`).join("") + `</div><div class="fb">`;
+  const expl = fb.score_explanations || {};
+  if (Object.keys(expl).length) {
+    html += `<h4>Why these scores</h4>`;
+    for (const skill of SKILLS) {
+      const ex = expl[skill];
+      if (!ex) continue;
+      html += `<div class="scorewhy">
+        <div class="scorewhy-head">${skill} — ${scores[skill] ?? "—"}/10</div>
+        <div>${esc(ex.why || "")}</div>
+        ${ex.to_ten ? `<div class="toten">🔟 <strong>To make it 10/10:</strong> ${esc(ex.to_ten)}</div>` : ""}
+      </div>`;
+    }
+  }
   if (fb.strengths?.length) html += `<h4>What worked</h4><ul>` + fb.strengths.map(s => `<li>✅ ${esc(s)}</li>`).join("") + `</ul>`;
-  if (fb.improvements?.length) html += `<h4>Level up</h4><ul>` + fb.improvements.map(s => `<li>🎯 ${esc(s)}</li>`).join("") + `</ul>`;
+  if (fb.improvements?.length) {
+    html += `<h4>Level up</h4><ul>` + fb.improvements.map(s => {
+      if (typeof s === "string") return `<li>🎯 ${esc(s)}</li>`;
+      return `<li>🎯 ${esc(s.advice || "")}${s.example ? `<div class="advice-example">✏️ ${esc(s.example)}</div>` : ""}</li>`;
+    }).join("") + `</ul>`;
+  }
   if (fb.upgraded_version) html += `<h4>How I'd say it</h4><div class="upgraded">${esc(fb.upgraded_version)}</div>`;
   else if (PREVIEW) html += `<h4>How I'd say it</h4><div class="upgraded"><em>Your text is already clean on the mechanical signals this preview can measure. The deployed app always rewrites your answer with GPT-4o — for meaning, flow, and impact, not just mechanics.</em></div>`;
   if (fb.coach_note) html += `<div class="coachnote">💬 ${esc(fb.coach_note)}</div>`;
@@ -963,7 +1048,8 @@ function renderMain() {
         <div class="rp-log">${rp.msgs.map(mm =>
           `<div class="rp-msg ${mm.who === "you" ? "rp-you" : "rp-them"}">${esc(mm.text)}</div>`).join("")}
           ${rp.waiting ? '<div class="rp-msg rp-them"><em>…</em></div>' : ""}</div>
-        <textarea id="rp_input" placeholder="Your response — out loud first, then type what you said..."></textarea>
+        ${recorderRow("roleplay", "Record your reply")}
+        <textarea id="rp_input" placeholder="...or type your response. Hit Reply to send whichever you gave."></textarea>
         <div class="row">
           <button class="btn btn-primary" onclick="sendRoleplay()">Reply</button>
           <button class="btn" id="go_roleplay" data-label="🏁 End & get coached" onclick="coachRoleplay()">🏁 End & get coached</button>
