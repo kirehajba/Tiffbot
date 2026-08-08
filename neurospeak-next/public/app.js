@@ -1,0 +1,1466 @@
+"use strict";
+const PREVIEW = false; // flipped to true in the sandbox preview build
+
+/* ------------------------------ Exercise banks ------------------------------ */
+const TWISTERS = [
+  ["Red leather, yellow leather, red leather, yellow leather.", "easy"],
+  ["Unique New York, unique New York, you know you need unique New York.", "easy"],
+  ["She sells seashells by the seashore, and the shells she sells are seashells.", "medium"],
+  ["Six sleek swans swam swiftly southwards.", "medium"],
+  ["A proper copper coffee pot, a proper copper coffee pot.", "medium"],
+  ["Peter Piper picked a peck of pickled peppers; a peck of pickled peppers Peter Piper picked.", "hard"],
+  ["The sixth sick sheikh's sixth sheep's sick.", "hard"],
+  ["Strategic statistics stipulate stronger structural standards.", "hard"],
+  ["Executives execute exceptional expectations expertly and expediently.", "hard"],
+  ["Brisk brave brigadiers brandished broad bright blades.", "hard"],
+];
+const TOPICS = [
+  "Convince a skeptical executive team to fund your project in 60 seconds.",
+  "Explain what you do at work to a curious 10-year-old.",
+  "You just walked into the elevator with the CEO. Introduce yourself and your biggest current win.",
+  "A colleague publicly challenged your idea in a meeting. Respond with composure.",
+  "Announce a difficult change to your team while keeping morale up.",
+  "Pitch yourself for a promotion in under a minute — no notes.",
+  "Describe a failure you learned from, framed as a leadership story.",
+  "Explain why clear communication matters more as you get more senior.",
+  "Give a 60-second toast at a colleague's farewell party.",
+  "Summarize your week for a stakeholder who has 45 seconds and no context.",
+  "Persuade your team to adopt a tool or habit they're resisting.",
+  "You have one minute to open a town hall meeting. Set the tone.",
+  "Defend an unpopular but correct decision you made.",
+  "Explain a complex idea from your field using only everyday language.",
+  "Tell a stranger why your work matters to the world.",
+];
+const PASSAGES = [
+  "At this point in time, we are currently in the process of conducting a review of the various different options that are available to us, and it is our intention to make a final decision at some point in the near future once we have had the opportunity to fully evaluate each and every one of the alternatives.",
+  "I just wanted to reach out and touch base with you in order to see if you might possibly have some availability at some point this week to maybe hop on a quick call so we could discuss and talk through some of the thoughts and ideas I've been having recently about the project.",
+  "Due to the fact that there has been a significant amount of confusion with regard to the new policy, it has been decided by the management team that an additional meeting will be scheduled for the purpose of providing further clarification to all of the employees who may be affected.",
+  "In my personal opinion, I think that it would probably be a good idea for us to consider the possibility of perhaps starting the planning process earlier than we did last year, because of the fact that last year we ended up running out of time at the end.",
+  "The reason why the project was delayed is because of the fact that there were a number of unforeseen and unexpected challenges that arose during the course of the implementation phase, which required the team to spend additional extra time resolving them before being able to move forward.",
+  "It goes without saying that each and every member of the team should make an effort to try to attend the upcoming training session, which will serve to provide everyone with the necessary skills that will be needed going forward in the future.",
+];
+const FRAMEWORKS = {
+  "PREP": {
+    structure: "Point → Reason → Example → Point (restated)",
+    description: "The fastest way to sound structured under pressure.",
+    prompts: [
+      "Should meetings default to 25 minutes instead of 30?",
+      "Is remote work better for deep-focus roles?",
+      "Should leaders share their failures openly with their teams?",
+      "Is it better to be respected or liked as a manager?",
+      "Should companies ban after-hours email?",
+    ],
+  },
+  "STAR": {
+    structure: "Situation → Task → Action → Result",
+    description: "The interview and storytelling workhorse.",
+    prompts: [
+      "Tell me about a time you influenced a decision without authority.",
+      "Describe a moment you turned around an underperforming situation.",
+      "Tell me about a time you had to deliver bad news.",
+      "Describe a conflict with a colleague and how you resolved it.",
+      "Tell me about the achievement you're most proud of.",
+    ],
+  },
+  "What / So What / Now What": {
+    structure: "What happened → So what does it mean → Now what should we do",
+    description: "The executive-update pattern senior audiences expect.",
+    prompts: [
+      "Update leadership on a project that slipped two weeks.",
+      "Brief your team on a competitor's surprising product launch.",
+      "Report a customer complaint trend to your boss.",
+      "Summarize the results of an experiment that failed.",
+      "Present a budget overrun to the steering committee.",
+    ],
+  },
+  "Rule of Three": {
+    structure: "One message → three supporting points → close",
+    description: "Audiences remember things in threes.",
+    prompts: [
+      "Why should someone join your team? Three reasons.",
+      "What makes a great meeting? Three ingredients.",
+      "Why do good employees quit? Three causes.",
+      "What builds trust fastest? Three behaviors.",
+      "What separates senior leaders from managers? Three differences.",
+    ],
+  },
+};
+const WORDS = [
+  ["articulate", "expressing ideas fluently and coherently"],
+  ["galvanize", "to shock or excite someone into taking action"],
+  ["cogent", "clear, logical, and convincing"],
+  ["distill", "to extract the essential meaning from something"],
+  ["catalyze", "to cause or accelerate a change"],
+  ["succinct", "briefly and clearly expressed"],
+  ["underscore", "to emphasize or draw attention to"],
+  ["delineate", "to describe or portray precisely"],
+  ["pragmatic", "dealing with things sensibly and realistically"],
+  ["salient", "most noticeable or important"],
+  ["elucidate", "to make something clear; explain"],
+  ["juxtapose", "to place side by side for contrast"],
+  ["consensus", "general agreement among a group"],
+  ["leverage", "to use something to maximum advantage"],
+  ["paradigm", "a typical example or pattern of something"],
+];
+const NEURO = {
+  warmup: "<strong>Motor cortex priming.</strong> Rapid, precise articulation drills activate the motor pathways controlling your lips, tongue, and jaw. Daily repetition strengthens the myelin insulation around those circuits, making crisp diction automatic — so under pressure, your mouth keeps up with your mind.",
+  impromptu: "<strong>Retrieval under pressure.</strong> Speaking with no script forces your brain to retrieve and organize ideas in real time — retrieval practice, the single most powerful driver of durable learning. Mild time pressure triggers norepinephrine release, tagging the practice as important and accelerating rewiring.",
+  precision: "<strong>Error-driven learning.</strong> Comparing your rewrite against a tighter version creates a prediction error — the gap between what you produced and what's possible. Dopamine-driven error signals are exactly what the brain uses to update its internal models. Verbose habits get pruned; concise phrasing becomes default.",
+  structure: "<strong>Chunking.</strong> Frameworks like PREP and STAR let your brain chunk a complex answer into familiar slots, freeing working memory for content instead of scaffolding. With spaced repetition, the framework migrates from effortful recall to automatic habit.",
+  vocab: "<strong>Elaborative encoding.</strong> Using a new word in your own sentence — rather than just reading it — connects it to your existing semantic network. Words you <em>produce</em> become words you can reach for mid-sentence.",
+};
+const FILLERS = new Set(["um","uh","erm","like","basically","actually","literally","right","so","well"]);
+const SKILLS = ["clarity","concision","structure","impact"];
+
+const SYSTEM_PROMPT = `You are an elite executive communication coach with decades of experience training leaders, TED speakers, and senior executives. You are coaching a client through a communication drill. Speak in first person, warm but direct — like a trusted mentor who tells the truth kindly.
+
+You MUST respond with a single JSON object with exactly these keys:
+- "scores": object with integer scores 1-10 for "clarity", "concision", "structure", "impact"
+- "score_explanations": object with one entry per skill ("clarity", "concision", "structure", "impact"), each an object with:
+    - "why": 1-2 sentences explaining THIS specific score, quoting the exact words or phrases from the client's response that earned or cost points
+    - "to_ten": what would make this dimension 10/10, ending with a concrete example sentence the client could actually have said
+- "strengths": array of 1-3 short strings — what genuinely worked, each quoting the client's actual words
+- "improvements": array of 1-3 objects, each with:
+    - "advice": the highest-leverage fix, stated plainly
+    - "example": a concrete before → after built from the client's own answer — quote their phrase, then show the improved phrase (format: “their words” → “better words”)
+- "upgraded_version": string — your rewritten, stronger version of their response (same length or shorter)
+- "coach_note": string — 1-2 encouraging sentences in your voice, referencing neuroplasticity when natural
+
+Score honestly. A rambling answer should score low on concision. Reserve 9-10 for genuinely executive-level responses.
+Base every observation on the client's ACTUAL words — quote the exact phrases you are reacting to. The upgraded_version must be a rewrite of what THEY said, never invented content about topics they did not mention.`;
+
+/* ------------------------------ State & storage ------------------------------ */
+const $ = (id) => document.getElementById(id);
+const store = {
+  get key() { return localStorage.getItem("ns_api_key") || ""; },
+  set key(v) { v ? localStorage.setItem("ns_api_key", v) : localStorage.removeItem("ns_api_key"); },
+  get history() { try { return JSON.parse(localStorage.getItem("ns_history")) || []; } catch { return []; } },
+  push(entry) {
+    const h = store.history; h.push(entry);
+    localStorage.setItem("ns_history", JSON.stringify(h));
+    renderStreak();
+    scheduleSync();
+  },
+};
+
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function hashStr(s) { let h = 0; for (const c of s) { h = (h * 31 + c.charCodeAt(0)) | 0; } return Math.abs(h); }
+const picks = {};
+function dailyPick(salt, len) {
+  if (!(salt in picks)) picks[salt] = hashStr(todayStr() + "-" + salt) % len;
+  return picks[salt];
+}
+function shuffle(salt, len) {
+  const cur = picks[salt] ?? 0;
+  let next = Math.floor(Math.random() * len);
+  if (len > 1 && next === cur) next = (next + 1) % len;
+  picks[salt] = next;
+}
+
+function computeStreak(history) {
+  const days = new Set(history.map(h => h.date));
+  if (!days.size) return 0;
+  const day = new Date();
+  const iso = d => d.toISOString().slice(0, 10);
+  if (!days.has(iso(day))) day.setDate(day.getDate() - 1);
+  if (!days.has(iso(day))) return 0;
+  let streak = 0;
+  while (days.has(iso(day))) { streak++; day.setDate(day.getDate() - 1); }
+  return streak;
+}
+function skillAverages(history) {
+  const tot = {};
+  for (const h of history) for (const [k, v] of Object.entries(h.scores || {}))
+    if (SKILLS.includes(k) && typeof v === "number") (tot[k] = tot[k] || []).push(v);
+  return Object.fromEntries(Object.entries(tot).map(([k, v]) => [k, +(v.reduce((a, b) => a + b) / v.length).toFixed(1)]));
+}
+function renderStreak() {
+  const s = computeStreak(store.history);
+  $("streakChip").textContent = `🔥 ${s}-day streak`;
+}
+
+/* ------------------------------ OpenAI calls ------------------------------ */
+function requireKey() {
+  return "managed-server-side";
+}
+async function transcribe(blob) {
+  const key = requireKey();
+  const fd = new FormData();
+  fd.append("file", blob, "recording.webm");
+  fd.append("model", "gpt-4o-transcribe");
+  fd.append("prompt", "Transcribe verbatim, including filler words like um, uh, like, you know.");
+  const r = await fetch("/api/openai/audio/transcriptions", {
+    method: "POST", headers: { Authorization: `Bearer ${key}` }, body: fd,
+  });
+  if (!r.ok) throw new Error(`Transcription failed (${r.status}): ${(await r.text()).slice(0, 200)}`);
+  return (await r.json()).text;
+}
+async function getFeedback(drill, task, response, extra) {
+  if (PREVIEW) { await new Promise(r => setTimeout(r, 700)); return localCoach(drill, response); }
+  const key = requireKey();
+  let user = `DRILL: ${drill}\n\nTASK GIVEN TO CLIENT:\n${task}\n\nCLIENT'S RESPONSE:\n${response}\n`;
+  if (extra) user += `\nADDITIONAL CONTEXT:\n${extra}\n`;
+  const r = await fetch("/api/openai/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: user }],
+      response_format: { type: "json_object" }, temperature: 0.5, max_tokens: 1600,
+    }),
+  });
+  if (!r.ok) throw new Error(`Feedback failed (${r.status}): ${(await r.text()).slice(0, 200)}`);
+  const fb = JSON.parse((await r.json()).choices[0].message.content);
+  if (!fb.upgraded_version) {
+    try { fb.upgraded_version = await fetchRewrite(task, response); } catch (e) { /* keep feedback without it */ }
+  }
+  return fb;
+}
+
+/* Dedicated rewrite call — guarantees a "how I'd say it" version after every coaching. */
+async function fetchRewrite(task, response) {
+  const key = requireKey();
+  const r = await fetch("/api/openai/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "You are an elite executive communication coach." },
+        { role: "user", content:
+          `Task the client was given: ${task}\n\nWhat the client said:\n${response}\n\n` +
+          `Rewrite the client's response as it should ideally be said — clear, concise, well-structured, impactful. ` +
+          `Keep their meaning and their voice; do not invent content they didn't say. Return ONLY the rewritten text.` },
+      ],
+      temperature: 0.5, max_tokens: 400,
+    }),
+  });
+  if (!r.ok) throw new Error(`Rewrite failed (${r.status})`);
+  return (await r.json()).choices[0].message.content.trim();
+}
+
+/* ------------------------------ Local analysis ------------------------------ */
+const normWords = s => s.split(/\s+/).map(w => w.replace(/^[.,;:!?'"“”‘’]+|[.,;:!?'"“”‘’]+$/g, "").toLowerCase()).filter(Boolean);
+function similarity(a, b) {
+  const A = normWords(a), B = normWords(b);
+  const dp = Array.from({ length: A.length + 1 }, () => new Array(B.length + 1).fill(0));
+  for (let i = 1; i <= A.length; i++) for (let j = 1; j <= B.length; j++)
+    dp[i][j] = A[i-1] === B[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  return A.length + B.length ? (2 * dp[A.length][B.length]) / (A.length + B.length) : 0;
+}
+const countFillers = t => normWords(t).filter(w => FILLERS.has(w)).length;
+
+const HEDGES = ["i think", "i guess", "maybe", "perhaps", "possibly", "probably", "kind of", "sort of", "a little bit"];
+const VERBOSE = [
+  ["due to the fact that", "because"], ["owing to the fact that", "because"], ["in spite of the fact that", "although"],
+  ["because of the fact that", "because"], ["at this point in time", "now"], ["at the present time", "now"],
+  ["at some point in the near future", "soon"], ["in the near future", "soon"], ["in order to", "to"],
+  ["for the purpose of", "to"], ["with regard to", "about"], ["in regard to", "about"],
+  ["each and every", "every"], ["first and foremost", "first"], ["unforeseen and unexpected", "unexpected"],
+  ["additional extra", "extra"], ["reach out and touch base", "contact"], ["touch base", "talk"],
+  ["a number of", "several"], ["the vast majority of", "most"], ["currently in the process of", ""],
+  ["in the process of", ""], ["it goes without saying that", ""], ["needless to say,", ""],
+  ["going forward in the future", "going forward"], ["make an effort to try to", "try to"],
+  ["in my personal opinion", "in my opinion"], ["various different", "different"],
+];
+function analyzeText(text) {
+  const lower = " " + text.toLowerCase().replace(/\s+/g, " ") + " ";
+  const found = VERBOSE.filter(([p]) => lower.includes(p)).map(([p]) => p);
+  const hedges = HEDGES.filter(h => lower.includes(" " + h + " "));
+  const fillers = countFillers(text);
+  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+  const words = normWords(text);
+  const avgLen = sentences.length ? Math.round(words.length / sentences.length) : words.length;
+  let rewrite = " " + text.replace(/\s+/g, " ").trim() + " ";
+  for (const [p, r] of VERBOSE)
+    rewrite = rewrite.replace(new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), r);
+  rewrite = rewrite.replace(/\b(um|uh|erm),?\s*/gi, "");
+  rewrite = rewrite.replace(/\s{2,}/g, " ").replace(/\s+([.,;:!?])/g, "$1").trim();
+  if (rewrite) rewrite = rewrite.charAt(0).toUpperCase() + rewrite.slice(1);
+  return { found, hedges, fillers, sentences: sentences.length, avgLen, words: words.length, rewrite };
+}
+
+/* Preview-mode coach: honest scores from measurable signals in the user's actual text. */
+function localCoach(drill, text) {
+  const a = analyzeText(text);
+  const strengths = [], improvements = [];
+  if (a.words <= 30) strengths.push(`Tight length — ${a.words} words holds attention`);
+  if (a.sentences > 0 && a.avgLen <= 18) strengths.push(`Digestible sentences (avg ${a.avgLen} words)`);
+  if (!a.fillers) strengths.push("No filler words — clean delivery");
+  if (a.found.length) {
+    const first = VERBOSE.find(v => v[0] === a.found[0]);
+    improvements.push({
+      advice: `Cut the verbose phrases: ${a.found.map(f => `“${f}”`).join(", ")}`,
+      example: `“${a.found[0]}” → ${first && first[1] ? `“${first[1]}”` : "delete it entirely"}`,
+    });
+  }
+  if (a.hedges.length) improvements.push({
+    advice: `Hedges dilute authority: ${a.hedges.map(h => `“${h}”`).join(", ")}`,
+    example: `“I think we should maybe start now” → “We start now.”`,
+  });
+  if (a.fillers) improvements.push({
+    advice: `${a.fillers} filler word${a.fillers > 1 ? "s" : ""} — pause silently instead`,
+    example: `“Um, so, basically the plan is…” → (breath) “The plan is…”`,
+  });
+  if (a.avgLen > 22) improvements.push({
+    advice: `Average sentence runs ${a.avgLen} words — split it up for punch`,
+    example: `One idea per sentence: “We tested it. It worked. We should scale it.”`,
+  });
+  if (!strengths.length) strengths.push("You got the rep in — that's what rewires the circuit");
+  if (!improvements.length) improvements.push({
+    advice: "Clean on every measurable signal — the live AI coach digs into meaning and persuasion",
+    example: "Deploy the app and re-run this drill for GPT-4o coaching on your exact words.",
+  });
+  const concision = Math.max(3, 9 - a.found.length - Math.min(3, a.fillers) - a.hedges.length);
+  const clarity = a.avgLen <= 14 ? 9 : a.avgLen <= 20 ? 8 : a.avgLen <= 26 ? 6 : 4;
+  const structure = a.sentences >= 2 && a.sentences <= 6 ? 8 : 5;
+  const impact = Math.max(3, Math.round((concision + clarity) / 2) - (a.hedges.length ? 1 : 0));
+  const changed = normWords(a.rewrite).join(" ") !== normWords(text).join(" ");
+  const score_explanations = {
+    clarity: {
+      why: a.sentences
+        ? `Your ${a.sentences} sentence${a.sentences > 1 ? "s" : ""} average ${a.avgLen} words — ${a.avgLen <= 18 ? "digestible for a listener." : "long enough that listeners lose the thread."}`
+        : `One unbroken stream of ${a.words} words gives the listener nowhere to breathe.`,
+      to_ten: `Keep sentences under ~16 words, one idea each — e.g. “The project slipped. The launch is at risk. I need a decision Friday.”`,
+    },
+    concision: {
+      why: (a.found.length || a.fillers)
+        ? `Detected: ${[a.found.length ? `verbose phrases (${a.found.map(f => `“${f}”`).join(", ")})` : "", a.fillers ? `${a.fillers} filler word${a.fillers > 1 ? "s" : ""}` : ""].filter(Boolean).join(" and ")}.`
+        : `No verbose phrases or fillers detected in your ${a.words} words.`,
+      to_ten: `Every word earns its place — e.g. “due to the fact that” → “because”.`,
+    },
+    structure: {
+      why: a.sentences >= 2 && a.sentences <= 6
+        ? `${a.sentences} sentences give the answer a visible beginning, middle, and end.`
+        : (a.sentences < 2
+          ? `A single run-on sentence has no structure a listener can follow.`
+          : `${a.sentences} sentences without a clear frame tend to wander.`),
+      to_ten: `Use an explicit frame like PREP — Point (“Yes — fund it”), Reason (“it pays back in 3 months”), Example (“team X saved 10 hours/week”), Point again (“so I'm asking for a yes”).`,
+    },
+    impact: {
+      why: a.hedges.length
+        ? `Hedging (${a.hedges.map(h => `“${h}”`).join(", ")}) softens your authority exactly where you need it most.`
+        : `No hedges — your statements land as statements.`,
+      to_ten: `End on the ask, not a trailing thought — e.g. “I'm asking for a yes today.”`,
+    },
+  };
+  return {
+    scores: { clarity, concision, structure, impact },
+    score_explanations,
+    strengths: strengths.slice(0, 3),
+    improvements: improvements.slice(0, 3),
+    upgraded_version: changed ? a.rewrite : "",
+    coach_note: "Preview analysis — these scores come from measurable signals in your actual words (fillers, hedges, verbose phrases, sentence length). The deployed app adds live GPT-4o coaching on meaning and persuasion.",
+  };
+}
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* ------------------------------ Idea kits ------------------------------ */
+const IDEA_KITS = {
+  impromptu: {
+    angles: [
+      "Open with a surprising number or concrete fact",
+      "Tell a two-sentence personal story, then draw the lesson",
+      "Make one bold claim, then defend it",
+      "Paint the before/after picture: 'Three months ago X — today Y'",
+    ],
+    openers: [
+      "“The one thing that matters here is…”",
+      "“Let me give you the 30-second version.”",
+      "“Imagine if…”",
+      "“I'll be direct:…”",
+    ],
+    shape: "Shape: point → proof → ask. One idea per sentence. End on the ask, not a trailing thought.",
+  },
+  precision: {
+    angles: [
+      "Find the ONE thing the passage actually says — write only that",
+      "Delete every phrase that can vanish without losing meaning",
+      "Turn passive constructions (“it has been decided”) into active ones (“we decided”)",
+    ],
+    shape: "Aim for one or two sentences. Lead with the actor: who does what, by when.",
+  },
+  structure: {
+    shape: "Say the framework's labels in your head as you go — the listener should be able to reverse-engineer them.",
+    byFramework: {
+      "PREP": "<strong>Point:</strong> Yes — make 25 minutes the default. <strong>Reason:</strong> meetings expand to fill whatever time we give them. <strong>Example:</strong> when our team switched in Q2 we covered the same agendas and got three hours a week back. <strong>Point:</strong> so default to 25; book 50 only when we've earned it.",
+      "STAR": "<strong>Situation:</strong> our launch was slipping. <strong>Task:</strong> I had to align three teams in one week. <strong>Action:</strong> I ran a single 30-minute decision meeting with a one-page brief. <strong>Result:</strong> we shipped four days early.",
+      "What / So What / Now What": "<strong>What:</strong> the project slipped two weeks. <strong>So what:</strong> our Q3 launch window is now at risk. <strong>Now what:</strong> I recommend cutting scope on X to hold the date — I need a decision by Friday.",
+      "Rule of Three": "“People quit for three reasons: no growth, no voice, no recognition. Fix those three and retention fixes itself.”",
+    },
+  },
+  vocab: {
+    angles: [
+      "Anchor it to a real moment — a meeting, a decision, a deadline",
+      "Put the word where the emphasis lands: the start or the end of the sentence",
+      "Say it out loud once — if it sounds forced, simplify the rest of the sentence around it",
+    ],
+    shape: "One sentence you could genuinely say in your next meeting.",
+  },
+};
+
+async function fetchIdeas(task) {
+  const key = requireKey();
+  const r = await fetch("/api/openai/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content:
+        `Task a communication-training client is about to attempt: ${task}\n\n` +
+        `Give exactly 3 short idea sparks (different angles, one line each) and 1 strong opening line. ` +
+        `Do NOT write a full answer — just sparks to get them started. ` +
+        `The opener must be 15 words or fewer, direct, no throat-clearing or corporate padding.\n` +
+        `Format:\n- spark\n- spark\n- spark\nOpener: "..."` }],
+      temperature: 0.8, max_tokens: 180,
+    }),
+  });
+  if (!r.ok) throw new Error(`Idea generation failed (${r.status})`);
+  return (await r.json()).choices[0].message.content.trim();
+}
+
+async function fetchStructureIdeas(framework, structure, task) {
+  const key = requireKey();
+  const r = await fetch("/api/openai/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.7, max_tokens: 300,
+      messages: [{ role: "user", content:
+        `Prompt a client must answer: ${task}\nRequired structure: ${framework} (${structure})\n\n` +
+        `Return JSON: {"example": "...", "sparks": ["...", "..."]}\n` +
+        `- "example": a compact worked example answering THIS exact prompt with the required structure, each part introduced by its label (e.g. "What:", "So what:", "Now what:"). Under 80 words, executive-crisp, no padding.\n` +
+        `- "sparks": 2 one-line angle ideas for a different way to answer.` }],
+    }),
+  });
+  if (!r.ok) throw new Error(`Idea generation failed (${r.status})`);
+  return JSON.parse((await r.json()).choices[0].message.content);
+}
+
+async function showIdeas(id) {
+  const box = $(`ideas_${id}`);
+  if (!box.classList.contains("hidden")) { box.classList.add("hidden"); return; }
+  let kit, task;
+  if (id === "impromptu") {
+    kit = IDEA_KITS.impromptu;
+    task = TOPICS[dailyPick("impromptu", TOPICS.length)];
+  } else if (id === "precision") {
+    kit = IDEA_KITS.precision;
+    task = "Rewrite this concisely: " + PASSAGES[dailyPick("precision", PASSAGES.length)];
+  } else if (id === "structure") {
+    const sel = window._fw || Object.keys(FRAMEWORKS)[0];
+    kit = { example: IDEA_KITS.structure.byFramework[sel], shape: IDEA_KITS.structure.shape };
+    task = FRAMEWORKS[sel].prompts[dailyPick("structure-" + sel, FRAMEWORKS[sel].prompts.length)] + ` — answered using the ${sel} structure`;
+  } else {
+    const [w, d] = WORDS[dailyPick("vocab", WORDS.length)];
+    kit = IDEA_KITS.vocab;
+    task = `Use the word "${w}" (${d}) naturally in a professional sentence.`;
+  }
+  let html = "";
+  if (kit.angles?.length) html += `<h4>Angles to try</h4><ul>${kit.angles.map(a => `<li>${a}</li>`).join("")}</ul>`;
+  if (kit.openers?.length) html += `<h4>Strong openers</h4><ul>${kit.openers.map(o => `<li>${o}</li>`).join("")}</ul>`;
+  if (kit.example) html += `<h4>Worked example — generic scenario, same shape</h4><div class="upgraded">${kit.example}</div>`;
+  if (kit.shape) html += `<p class="hint">${kit.shape}</p>`;
+  box.innerHTML = html + (PREVIEW
+    ? `<p class="hint">✨ The deployed app also generates ideas tailored to this exact prompt.</p>`
+    : `<p class="hint" id="sparks_${id}">✨ Generating ideas for this exact prompt...</p>`);
+  box.classList.remove("hidden");
+  if (!PREVIEW) {
+    try {
+      const el = $(`sparks_${id}`);
+      if (id === "structure") {
+        const sel = window._fw || Object.keys(FRAMEWORKS)[0];
+        const data = await fetchStructureIdeas(sel, FRAMEWORKS[sel].structure, task);
+        const bolded = esc(data.example || "").replace(/(^|[.!?”"']\s+)([A-Z][a-zA-Z ]{1,12}):/g, "$1<strong>$2:</strong>");
+        if (el) el.outerHTML = `<h4>✨ Worked example for THIS prompt</h4><div class="upgraded">${bolded}</div>`
+          + (data.sparks?.length ? `<h4>Other angles</h4><ul>${data.sparks.map(s => `<li>${esc(s)}</li>`).join("")}</ul>` : "");
+      } else {
+        const sparks = await fetchIdeas(task);
+        if (el) el.outerHTML = `<h4>✨ For this exact prompt</h4><div class="upgraded">${esc(sparks).replace(/\n/g, "<br>")}</div>`;
+      }
+    } catch (e) {
+      const el = $(`sparks_${id}`);
+      if (el) el.textContent = "Tailored ideas need your API key (⚙️ top right).";
+    }
+  }
+}
+window.showIdeas = showIdeas;
+
+/* ------------------------------ Roleplay ------------------------------ */
+const PERSONAS = {
+  "Skeptical CFO": {
+    opener: "You have my attention for exactly one pitch. What do you want, and what does it cost me?",
+    style: "You are a skeptical CFO. You care about numbers, ROI, risk, and this quarter. You interrupt vague claims and demand specifics.",
+    canned: [
+      "I hear ambition, but I don't hear numbers. What does this cost this quarter, and what do I get back?",
+      "We've funded initiatives like this before and they died quietly. Why is yours different?",
+      "You have thirty more seconds. Give me the one number that makes this a yes.",
+    ],
+  },
+  "Tough Interviewer": {
+    opener: "Your CV says a lot of things. Tell me about something that went wrong on your watch.",
+    style: "You are a tough but fair senior interviewer. You probe for specifics, personal ownership, and results. You follow up on anything vague.",
+    canned: [
+      "That's the polished version. What actually happened, and what was YOUR specific role?",
+      "You said 'we' several times. What did *you* decide?",
+      "And if I called your last manager, what would they say was your weakness?",
+    ],
+  },
+  "Resistant Team": {
+    opener: "With respect — we've heard this kind of announcement before, and last time it just meant more work for us.",
+    style: "You are a respected senior member of a team resisting a change. Not hostile, but tired of initiatives. You voice the team's real objections.",
+    canned: [
+      "That sounds good in a slide deck. Who does this work while we keep shipping?",
+      "You still haven't said what happens to the people whose roles this changes.",
+      "If this fails like the last initiative, will you stand in front of us and own it?",
+    ],
+  },
+  "Distracted Executive": {
+    opener: "I have two minutes between meetings. Go.",
+    style: "You are a distracted senior executive with a short attention span. Reward crisp points; if the speaker rambles, cut them off and ask them to get to the point.",
+    canned: [
+      "You've used a minute and I still don't know what you're asking me for. One sentence: what do you need?",
+      "Skip the context. What's the decision?",
+      "Okay — send me one slide. What would its headline say?",
+    ],
+  },
+};
+
+function startRoleplay(name) {
+  window._rp = { persona: name, msgs: [{ who: "them", text: PERSONAS[name].opener }], canned: 0 };
+  renderMain();
+}
+
+async function fetchPersonaReply(rp) {
+  const key = requireKey();
+  const msgs = [{
+    role: "system",
+    content: `${PERSONAS[rp.persona].style} Stay fully in character. React to what the speaker actually said, push back on vagueness, and ask ONE pointed follow-up question per turn. Keep replies under 60 words. Never coach — you are the counterpart, not the coach.`,
+  }];
+  for (const m of rp.msgs) msgs.push({ role: m.who === "you" ? "user" : "assistant", content: m.text });
+  const r = await fetch("/api/openai/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "gpt-4o", messages: msgs, temperature: 0.7, max_tokens: 140 }),
+  });
+  if (!r.ok) throw new Error(`Reply failed (${r.status})`);
+  return (await r.json()).choices[0].message.content.trim();
+}
+
+async function sendRoleplay() {
+  const rp = window._rp;
+  if (!rp) return;
+  let text = $("rp_input").value.trim();
+  const R = recorders.roleplay;
+  if (!text && R?.blob) {
+    if (PREVIEW) return showMsg("roleplay", "warn", "Voice transcription needs the live app — type your reply in this preview.");
+    rp.waiting = true;
+    renderMain();
+    try { text = await transcribe(R.blob); }
+    catch (e) { rp.waiting = false; renderMain(); return showMsg("roleplay", "err", e.message); }
+    rp.waiting = false;
+    delete recorders.roleplay;
+  }
+  if (!text) return showMsg("roleplay", "warn", "Record or type a reply first.");
+  delete recorders.roleplay;
+  rp.msgs.push({ who: "you", text });
+  rp.waiting = true;
+  renderMain();
+  let reply;
+  if (PREVIEW) {
+    await new Promise(r => setTimeout(r, 700));
+    reply = PERSONAS[rp.persona].canned[rp.canned % PERSONAS[rp.persona].canned.length]
+      + " (sample pushback — the live app reacts to your exact words)";
+    rp.canned++;
+  } else {
+    try { reply = await fetchPersonaReply(rp); }
+    catch (e) { reply = `(${e.message})`; }
+  }
+  rp.waiting = false;
+  rp.msgs.push({ who: "them", text: reply });
+  renderMain();
+}
+
+async function coachRoleplay() {
+  const rp = window._rp;
+  const userTurns = rp.msgs.filter(m => m.who === "you");
+  if (!userTurns.length) return showMsg("roleplay", "warn", "Say something to your counterpart first.");
+  const transcript = rp.msgs
+    .map(m => (m.who === "you" ? "YOU: " : rp.persona.toUpperCase() + ": ") + m.text).join("\n");
+  setBusy("roleplay", true);
+  try {
+    const fb = await getFeedback(
+      `Roleplay vs ${rp.persona}`,
+      `Hold your own in a live conversation with a ${rp.persona}. Full transcript:\n${transcript}`,
+      userTurns.map(m => m.text).join("\n"),
+      "Coach ONLY the client's turns (marked YOU). Judge how they handled pushback: staying composed, answering the actual question asked, and keeping structure under pressure.",
+    );
+    renderFeedback("roleplay", "roleplay", fb);
+  } catch (e) { showMsg("roleplay", "err", e.message); }
+  finally { setBusy("roleplay", false); }
+}
+window.startRoleplay = startRoleplay;
+window.sendRoleplay = sendRoleplay;
+window.coachRoleplay = coachRoleplay;
+
+/* ------------------------------ My Meeting ------------------------------ */
+async function fetchCircuit(desc) {
+  const key = requireKey();
+  const r = await fetch("/api/openai/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      response_format: { type: "json_object" },
+      temperature: 0.6, max_tokens: 500,
+      messages: [{ role: "user", content:
+        `A client is preparing for this real upcoming situation:\n${desc}\n\n` +
+        `Return a JSON object with:\n` +
+        `- "questions": array of exactly 3 hard, realistic questions this specific audience will ask, phrased in the audience's own voice\n` +
+        `- "framework": best-fit structure, one of "PREP", "STAR", "What / So What / Now What", "Rule of Three"\n` +
+        `- "framework_reason": one sentence on why that framework fits\n` +
+        `- "opener_tip": one sentence of tailored advice for their opening line` }],
+    }),
+  });
+  if (!r.ok) throw new Error(`Circuit generation failed (${r.status})`);
+  return JSON.parse((await r.json()).choices[0].message.content);
+}
+
+async function buildCircuit() {
+  const desc = $("mt_desc").value.trim();
+  if (!desc) return showMsg("meeting", "warn", "Describe your situation first.");
+  const btn = $("mt_build");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Building your circuit...';
+  try {
+    let circuit;
+    if (PREVIEW) {
+      await new Promise(r => setTimeout(r, 800));
+      circuit = {
+        questions: [
+          "What does this cost, and what do we get back — in numbers?",
+          "Why now? What breaks if we wait six months?",
+          "Who owns this when something goes wrong?",
+        ],
+        framework: "What / So What / Now What",
+        framework_reason: "Executive audiences want facts, implication, recommendation — in that order.",
+        opener_tip: "Open with the single number or fact that makes your case undeniable. (Sample circuit — the live app tailors questions to your exact situation and audience.)",
+      };
+    } else {
+      circuit = await fetchCircuit(desc);
+    }
+    localStorage.setItem("ns_meeting", JSON.stringify({ desc, circuit }));
+    scheduleSync();
+    renderMain();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Build my training circuit";
+    showMsg("meeting", "err", e.message);
+  }
+}
+
+async function coachMeetingAnswer(i) {
+  const saved = JSON.parse(localStorage.getItem("ns_meeting"));
+  const q = saved.circuit.questions[i];
+  let ans = $(`mt_a${i}`).value.trim();
+  let prefix = "";
+  const R = recorders[`meeting${i}`];
+  if (!ans && R?.blob) {
+    if (PREVIEW) return showMsg(`meeting${i}`, "warn", "Voice transcription needs the live app — type your answer in this preview.");
+    setBusy(`meeting${i}`, true, "Transcribing...");
+    try { ans = await transcribe(R.blob); }
+    catch (e) { setBusy(`meeting${i}`, false); return showMsg(`meeting${i}`, "err", e.message); }
+    delete recorders[`meeting${i}`];
+    const fillers = countFillers(ans);
+    const duration = R.duration;
+    if (duration > 1) {
+      const wpm = Math.round(normWords(ans).length / duration * 60);
+      prefix = `<div class="scores"><div class="score"><div class="lab">Pace</div><div class="val">${wpm} wpm</div></div>
+        <div class="score"><div class="lab">Filler words</div><div class="val">${fillers}</div></div></div>`;
+    }
+    prefix += `<div class="transcript">${esc(ans)}</div>`;
+  }
+  if (!ans) return showMsg(`meeting${i}`, "warn", "Record or type your answer first.");
+  setBusy(`meeting${i}`, true);
+  try {
+    const fb = await getFeedback(
+      "Real-meeting rehearsal",
+      `Situation: ${saved.desc}\nHard question from the audience: ${q}`,
+      ans,
+      `Judge whether the answer actually addresses the question, stays composed, and would land with this specific audience. If structure is weak, recommend the ${saved.circuit.framework} framework.`,
+    );
+    renderFeedback(`meeting${i}`, "meeting", fb, prefix);
+  } catch (e) { showMsg(`meeting${i}`, "err", e.message); }
+  finally { setBusy(`meeting${i}`, false); }
+}
+window.buildCircuit = buildCircuit;
+window.coachMeetingAnswer = coachMeetingAnswer;
+
+/* ------------------------------ Mock interview ------------------------------ */
+const IV_SENIORITIES = ["Individual contributor", "Manager", "Director", "VP / Executive"];
+const IV_STYLES = ["Friendly", "Neutral", "Tough"];
+const IV_CANNED_QUESTIONS = [
+  "Tell me about yourself and why this role.",
+  "Describe the project you're most proud of. What was YOUR specific contribution?",
+  "Tell me about a time you disagreed with a decision above you. What did you do?",
+  "This role demands strong stakeholder communication — walk me through a moment you influenced without authority.",
+  "If we hired you, what would worry you most about your first 90 days?",
+];
+
+function getAnswers() {
+  try { return JSON.parse(localStorage.getItem("ns_answers")) || []; } catch (e) { return []; }
+}
+function setAnswers(a) { localStorage.setItem("ns_answers", JSON.stringify(a)); scheduleSync(); }
+
+async function fetchInterviewQuestions(setup) {
+  const key = requireKey();
+  const r = await fetch("/api/openai/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      response_format: { type: "json_object" },
+      temperature: 0.7, max_tokens: 500,
+      messages: [{ role: "user", content:
+        `Generate a realistic job-interview question set.\n` +
+        `Role: ${setup.role}\nSeniority: ${setup.seniority}\nInterviewer style: ${setup.style}\n` +
+        (setup.jd ? `Job description:\n${setup.jd.slice(0, 3000)}\n` : "") +
+        `\nReturn JSON: {"questions": [exactly 5 strings]} — mix 2 behavioral, ` +
+        `${setup.jd ? "2 tailored directly to specific requirements in the job description" : "2 tailored to the role"}, ` +
+        `and 1 unexpected curveball. Phrase them the way a real ${setup.style.toLowerCase()} interviewer would speak.` }],
+    }),
+  });
+  if (!r.ok) throw new Error(`Question generation failed (${r.status})`);
+  return JSON.parse((await r.json()).choices[0].message.content);
+}
+
+async function fetchFollowup(question, answer) {
+  const key = requireKey();
+  const r = await fetch("/api/openai/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini", temperature: 0.6, max_tokens: 80,
+      messages: [{ role: "user", content:
+        `You are the interviewer. You asked: "${question}"\nThe candidate answered:\n"${answer.slice(0, 1500)}"\n\n` +
+        `If the answer left something vague, unproven, or unquantified, return ONLY one probing follow-up question (one sentence). ` +
+        `If the answer was genuinely complete, return exactly: NONE` }],
+    }),
+  });
+  if (!r.ok) return null;
+  const text = (await r.json()).choices[0].message.content.trim();
+  return /^NONE\b/i.test(text) ? null : text;
+}
+
+async function ivStart() {
+  const role = $("iv_role").value.trim();
+  if (!role) return showMsg("interview", "warn", "Enter the role you're interviewing for.");
+  const setup = {
+    role,
+    seniority: $("iv_seniority").value,
+    style: $("iv_style").value,
+    jd: $("iv_jd").value.trim(),
+  };
+  const btn = $("iv_start");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Preparing your interviewer...';
+  try {
+    let questions;
+    if (PREVIEW) {
+      await new Promise(r => setTimeout(r, 800));
+      questions = IV_CANNED_QUESTIONS;
+    } else {
+      questions = (await fetchInterviewQuestions(setup)).questions;
+    }
+    window._iv = {
+      setup,
+      queue: questions.map(t => ({ text: t, followup: false })),
+      idx: 0, results: [], phase: "active", answered: false, lastFb: null,
+    };
+    renderMain();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Start interview";
+    showMsg("interview", "err", e.message);
+  }
+}
+
+async function ivAnswer() {
+  const iv = window._iv;
+  const q = iv.queue[iv.idx];
+  let text = $("iv_input").value.trim();
+  const R = recorders.interview;
+  if (!text && R?.blob) {
+    if (PREVIEW) return showMsg("interview", "warn", "Voice transcription needs the live app — type your answer in this preview.");
+    setBusy("interview", true, "Transcribing...");
+    try { text = await transcribe(R.blob); }
+    catch (e) { setBusy("interview", false); return showMsg("interview", "err", e.message); }
+    delete recorders.interview;
+  }
+  if (!text) return showMsg("interview", "warn", "Record or type your answer first.");
+  setBusy("interview", true, "The interviewer is taking notes...");
+  try {
+    const fb = await getFeedback(
+      "Job interview answer",
+      `Interview for ${iv.setup.role} (${iv.setup.seniority}). ${q.followup ? "Follow-up question" : "Question"}: ${q.text}`,
+      text,
+      `Judge as a ${iv.setup.style.toLowerCase()} hiring interviewer would. ` +
+      (iv.setup.jd ? `Weigh fit against this job description: ${iv.setup.jd.slice(0, 1200)}. ` : "") +
+      `Reward specifics, ownership ("I" not "we"), and quantified results.`,
+    );
+    const nums = Object.values(fb.scores || {}).filter(v => typeof v === "number");
+    iv.results.push({
+      q: q.text, answer: text,
+      scores: fb.scores || {},
+      overall: nums.length ? +(nums.reduce((a, b) => a + b) / nums.length).toFixed(1) : 0,
+      upgraded: fb.upgraded_version || "",
+      fixes: (fb.improvements || []).map(i => typeof i === "string" ? i : i.advice).filter(Boolean),
+    });
+    if (!PREVIEW && !q.followup) {
+      try {
+        const fu = await fetchFollowup(q.text, text);
+        if (fu) iv.queue.splice(iv.idx + 1, 0, { text: fu, followup: true });
+      } catch (e) { /* follow-up is best-effort */ }
+    }
+    iv.answered = true; iv.lastFb = fb;
+    renderMain();
+    renderFeedback("interview", "interview", fb);
+  } catch (e) { showMsg("interview", "err", e.message); }
+  finally { const b = $("go_interview"); if (b) { b.disabled = false; b.innerHTML = b.dataset.label; } }
+}
+
+function ivNext() {
+  const iv = window._iv;
+  iv.idx++; iv.answered = false; iv.lastFb = null;
+  if (iv.idx >= iv.queue.length) {
+    iv.phase = "report";
+    const saved = getAnswers();
+    for (const r of iv.results) {
+      saved.push({ date: todayStr(), role: iv.setup.role, q: r.q, answer: r.answer, upgraded: r.upgraded, overall: r.overall });
+    }
+    setAnswers(saved);
+  }
+  renderMain();
+}
+window.ivStart = ivStart; window.ivAnswer = ivAnswer; window.ivNext = ivNext;
+
+/* ------------------------------ Text-to-speech ------------------------------ */
+async function hearIt(id) {
+  const text = (window._speakCache || {})[id];
+  if (!text) return;
+  try {
+    const key = requireKey();
+    const r = await fetch("/api/openai/audio/speech", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-4o-mini-tts", voice: "nova", input: text.slice(0, 2000) }),
+    });
+    if (!r.ok) throw new Error(`Speech failed (${r.status})`);
+    new Audio(URL.createObjectURL(await r.blob())).play();
+  } catch (e) { alert(e.message); }
+}
+window.hearIt = hearIt;
+
+/* ------------------------------ Progress export / import ------------------------------ */
+function exportProgress() {
+  const data = {
+    history: store.history,
+    answers: getAnswers(),
+    meeting: JSON.parse(localStorage.getItem("ns_meeting") || "null"),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "neurospeak-progress.json";
+  a.click();
+}
+function importProgress(ev) {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(reader.result);
+      if (Array.isArray(d.history)) localStorage.setItem("ns_history", JSON.stringify(d.history));
+      if (Array.isArray(d.answers)) setAnswers(d.answers);
+      if (d.meeting) localStorage.setItem("ns_meeting", JSON.stringify(d.meeting));
+      renderStreak(); renderMain();
+    } catch (e) { alert("That doesn't look like a NeuroSpeak progress file."); }
+  };
+  reader.readAsText(f);
+}
+function deleteAnswer(i) {
+  const a = getAnswers();
+  a.splice(i, 1);
+  setAnswers(a);
+  renderMain();
+}
+window.exportProgress = exportProgress; window.importProgress = importProgress; window.deleteAnswer = deleteAnswer;
+
+/* ------------------------------ Countdown timer ------------------------------ */
+let _timerInt = null;
+function startTimer(id, secs) {
+  clearInterval(_timerInt);
+  const el = $(`timer_${id}`);
+  let left = secs;
+  el.textContent = `${left}s`;
+  el.className = "timerbig";
+  _timerInt = setInterval(() => {
+    left--;
+    const node = $(`timer_${id}`);
+    if (!node) { clearInterval(_timerInt); return; }
+    if (left <= 0) {
+      clearInterval(_timerInt);
+      node.textContent = "⏰ Time! Wrap up.";
+      node.className = "timerbig low";
+      return;
+    }
+    node.textContent = `${left}s`;
+    if (left <= 10) node.className = "timerbig low";
+  }, 1000);
+}
+window.startTimer = startTimer;
+
+/* ------------------------------ Recording ------------------------------ */
+const recorders = {};
+async function toggleRecord(id) {
+  const btn = $(`rec_${id}`), player = $(`play_${id}`);
+  let R = recorders[id];
+  if (R && R.rec.state === "recording") {
+    R.rec.stop(); return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const rec = new MediaRecorder(stream);
+    const chunks = [];
+    R = recorders[id] = { rec, blob: null, duration: 0, start: 0 };
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => {
+      clearInterval(R.tick);
+      R.duration = (Date.now() - R.start) / 1000;
+      R.blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+      stream.getTracks().forEach(t => t.stop());
+      btn.textContent = "🎙️ Re-record"; btn.classList.remove("recording");
+      player.src = URL.createObjectURL(R.blob); player.classList.remove("hidden");
+    };
+    R.start = Date.now();
+    rec.start();
+    btn.textContent = "⏹ Stop"; btn.classList.add("recording");
+    R.tick = setInterval(() => {
+      btn.textContent = `⏹ Stop · ${Math.round((Date.now() - R.start) / 1000)}s`;
+    }, 500);
+    player.classList.add("hidden");
+  } catch (e) {
+    showMsg(id, "err", "Microphone isn't available here (embedded previews and some browsers block it). It works on the deployed site — for now, type your answer instead.");
+  }
+}
+function showMsg(id, kind, text) {
+  $(`out_${id}`).innerHTML = `<div class="alert ${kind}">${esc(text)}</div>`;
+}
+function setBusy(id, busy, label) {
+  const b = $(`go_${id}`);
+  b.disabled = busy;
+  b.innerHTML = busy ? `<span class="spin"></span>${label || "Coaching..."}` : b.dataset.label;
+}
+
+/* ------------------------------ Feedback rendering ------------------------------ */
+function renderFeedback(id, drill, fb, prefixHtml = "") {
+  const scores = fb.scores || {};
+  const nums = Object.values(scores).filter(v => typeof v === "number");
+  const overall = nums.length ? nums.reduce((a, b) => a + b) / nums.length : null;
+  let html = prefixHtml + `<div class="scores">` + SKILLS.map(s =>
+    `<div class="score"><div class="lab">${s}</div><div class="val">${scores[s] ?? "—"}/10</div></div>`).join("") + `</div><div class="fb">`;
+  const expl = fb.score_explanations || {};
+  if (Object.keys(expl).length) {
+    html += `<h4>Why these scores</h4>`;
+    for (const skill of SKILLS) {
+      const ex = expl[skill];
+      if (!ex) continue;
+      html += `<div class="scorewhy">
+        <div class="scorewhy-head">${skill} — ${scores[skill] ?? "—"}/10</div>
+        <div>${esc(ex.why || "")}</div>
+        ${ex.to_ten ? `<div class="toten">🔟 <strong>To make it 10/10:</strong> ${esc(ex.to_ten)}</div>` : ""}
+      </div>`;
+    }
+  }
+  if (fb.strengths?.length) html += `<h4>What worked</h4><ul>` + fb.strengths.map(s => `<li>✅ ${esc(s)}</li>`).join("") + `</ul>`;
+  if (fb.improvements?.length) {
+    html += `<h4>Level up</h4><ul>` + fb.improvements.map(s => {
+      if (typeof s === "string") return `<li>🎯 ${esc(s)}</li>`;
+      return `<li>🎯 ${esc(s.advice || "")}${s.example ? `<div class="advice-example">✏️ ${esc(s.example)}</div>` : ""}</li>`;
+    }).join("") + `</ul>`;
+  }
+  if (fb.upgraded_version) {
+    html += `<h4>How I'd say it</h4><div class="upgraded">${esc(fb.upgraded_version)}</div>`;
+    if (!PREVIEW) {
+      window._speakCache = window._speakCache || {};
+      window._speakCache[id] = fb.upgraded_version;
+      html += `<div class="row"><button class="btn btn-ghost" onclick="hearIt('${id}')">🔊 Hear it spoken</button></div>`;
+    }
+  }
+  else if (PREVIEW) html += `<h4>How I'd say it</h4><div class="upgraded"><em>Your text is already clean on the mechanical signals this preview can measure. The deployed app always rewrites your answer with GPT-4o — for meaning, flow, and impact, not just mechanics.</em></div>`;
+  if (fb.coach_note) html += `<div class="coachnote">💬 ${esc(fb.coach_note)}</div>`;
+  html += `</div>`;
+  $(`out_${id}`).innerHTML = html;
+  if (overall !== null) store.push({ date: todayStr(), drill, scores, overall: +overall.toFixed(1) });
+}
+
+/* ------------------------------ Tabs ------------------------------ */
+const TABS = [
+  ["warmup", "🔥 Warm-Up"], ["impromptu", "🎤 Impromptu"], ["roleplay", "🎭 Roleplay"],
+  ["interview", "💼 Interview"], ["meeting", "🎯 My Meeting"], ["precision", "✂️ Precision"],
+  ["structure", "🏗️ Structure"], ["vocab", "📚 Vocabulary"], ["answers", "📇 Answers"],
+  ["progress", "📈 Progress"],
+];
+let activeTab = "warmup";
+function renderTabs() {
+  $("tabs").innerHTML = TABS.map(([id, label]) =>
+    `<button class="tab ${id === activeTab ? "active" : ""}" onclick="switchTab('${id}')">${label}</button>`).join("");
+}
+function switchTab(id) { activeTab = id; renderTabs(); renderMain(); }
+window.switchTab = switchTab;
+
+function neuroBox(key) {
+  return `<details class="neuro"><summary>🧠 Why this works</summary><div>${NEURO[key]}</div></details>`;
+}
+function recorderRow(id, label) {
+  return `<div class="row">
+    <button class="btn btn-rec" id="rec_${id}" onclick="toggleRecord('${id}')">🎙️ ${label}</button>
+    <span class="hint">or type below</span></div>
+    <audio controls class="hidden" id="play_${id}"></audio>`;
+}
+window.toggleRecord = toggleRecord;
+
+/* ------------------------------ Tab renderers ------------------------------ */
+function renderMain() {
+  const m = $("main");
+  if (activeTab === "warmup") {
+    const i = dailyPick("warmup", TWISTERS.length);
+    const [tw, diff] = TWISTERS[i];
+    m.innerHTML = `<div class="card">
+      <p>Loosen up the articulators. Say the twister below <strong>three times, fast and clean</strong>, then record your best run.</p>
+      ${neuroBox("warmup")}
+      <div class="exercise"><strong>${esc(tw)}</strong><div class="meta">Difficulty: ${diff}</div></div>
+      <div class="row"><button class="btn btn-ghost" onclick="shuffle('warmup',${TWISTERS.length});renderMain()">🔄 New twister</button></div>
+      ${recorderRow("warmup", "Record best run")}
+      <div class="row"><button class="btn btn-primary" id="go_warmup" data-label="Score my diction" onclick="runWarmup()">Score my diction</button></div>
+      <div id="out_warmup"></div></div>`;
+  } else if (activeTab === "impromptu") {
+    const i = dailyPick("impromptu", TOPICS.length);
+    m.innerHTML = `<div class="card">
+      <p>You have a scenario and ~60 seconds. <strong>Record yourself speaking</strong> (best for training) or type your answer.</p>
+      ${neuroBox("impromptu")}
+      <div class="exercise">🎯 <strong>${esc(TOPICS[i])}</strong></div>
+      <div class="row"><button class="btn btn-ghost" onclick="shuffle('impromptu',${TOPICS.length});renderMain()">🔄 New scenario</button>
+        <button class="btn btn-ghost" onclick="showIdeas('impromptu')">💡 Give me ideas</button></div>
+      <div id="ideas_impromptu" class="ideasbox hidden"></div>
+      <div class="row"><button class="btn" onclick="startTimer('impromptu', 60)">⏱ Start 60-second clock</button>
+        <span class="timerbig" id="timer_impromptu"></span></div>
+      ${recorderRow("impromptu", "Record answer (45–75s)")}
+      <textarea id="txt_impromptu" placeholder="If you can't speak out loud right now, write exactly what you would say."></textarea>
+      <div class="row"><button class="btn btn-primary" id="go_impromptu" data-label="Get coaching" onclick="runImpromptu()">Get coaching</button></div>
+      <div id="out_impromptu"></div></div>`;
+  } else if (activeTab === "precision") {
+    const i = dailyPick("precision", PASSAGES.length);
+    const p = PASSAGES[i];
+    m.innerHTML = `<div class="card">
+      <p>Below is a bloated passage. <strong>Rewrite it in as few words as possible</strong> without losing meaning. Target: cut it by at least half.</p>
+      ${neuroBox("precision")}
+      <div class="exercise">${esc(p)}<div class="meta">Original: ${p.split(/\s+/).length} words</div></div>
+      <div class="row"><button class="btn btn-ghost" onclick="shuffle('precision',${PASSAGES.length});renderMain()">🔄 New passage</button>
+        <button class="btn btn-ghost" onclick="showIdeas('precision')">💡 Give me ideas</button></div>
+      <div id="ideas_precision" class="ideasbox hidden"></div>
+      <textarea id="txt_precision" placeholder="Your tightened version..."></textarea>
+      <div class="row"><button class="btn btn-primary" id="go_precision" data-label="Score my rewrite" onclick="runPrecision()">Score my rewrite</button></div>
+      <div id="out_precision"></div></div>`;
+  } else if (activeTab === "structure") {
+    const names = Object.keys(FRAMEWORKS);
+    const sel = window._fw || names[0];
+    const fw = FRAMEWORKS[sel];
+    const i = dailyPick("structure-" + sel, fw.prompts.length);
+    m.innerHTML = `<div class="card">
+      <p>Pick a framework, get a prompt, and answer <strong>using that structure explicitly</strong>.</p>
+      ${neuroBox("structure")}
+      <div class="row">${names.map(n =>
+        `<button class="btn ${n === sel ? "btn-primary" : ""}" onclick="window._fw='${n}';renderMain()">${n}</button>`).join("")}</div>
+      <p style="font-size:0.88rem"><strong>${esc(fw.structure)}</strong><br><span class="hint">${esc(fw.description)}</span></p>
+      <div class="exercise">🎯 <strong>${esc(fw.prompts[i])}</strong></div>
+      <div class="row"><button class="btn btn-ghost" onclick="shuffle('structure-${sel}',${fw.prompts.length});renderMain()">🔄 New prompt</button>
+        <button class="btn btn-ghost" onclick="showIdeas('structure')">💡 Give me ideas</button></div>
+      <div id="ideas_structure" class="ideasbox hidden"></div>
+      ${recorderRow("structure", "Record structured answer")}
+      <textarea id="txt_structure" placeholder="...or type your structured answer."></textarea>
+      <div class="row"><button class="btn btn-primary" id="go_structure" data-label="Check my structure" onclick="runStructure()">Check my structure</button></div>
+      <div id="out_structure"></div></div>`;
+  } else if (activeTab === "vocab") {
+    const i = dailyPick("vocab", WORDS.length);
+    const [w, d] = WORDS[i];
+    m.innerHTML = `<div class="card">
+      <p>Today's power word. <strong>Use it in a sentence you'd actually say at work</strong> — natural, not forced.</p>
+      ${neuroBox("vocab")}
+      <div class="exercise"><strong>${w}</strong> — <em>${d}</em></div>
+      <div class="row"><button class="btn btn-ghost" onclick="shuffle('vocab',${WORDS.length});renderMain()">🔄 New word</button>
+        <button class="btn btn-ghost" onclick="showIdeas('vocab')">💡 Give me ideas</button></div>
+      <div id="ideas_vocab" class="ideasbox hidden"></div>
+      <input type="text" id="txt_vocab" placeholder="Write a work sentence using “${w}”...">
+      <div class="row"><button class="btn btn-primary" id="go_vocab" data-label="Check my sentence" onclick="runVocab()">Check my sentence</button></div>
+      <div id="out_vocab"></div></div>`;
+  } else if (activeTab === "roleplay") {
+    const rp = window._rp;
+    if (!rp) {
+      m.innerHTML = `<div class="card">
+        <p><strong>Face a difficult counterpart.</strong> They push back and ask pointed follow-ups, turn by turn. Hold your ground, then get coached on how you handled it.</p>
+        <details class="neuro"><summary>🧠 Why this works</summary><div><strong>Stress inoculation + retrieval under pressure.</strong> Rehearsing against realistic pushback in a safe setting blunts the threat response for the real event, while forcing rapid retrieval — the combination that transfers to real meetings.</div></details>
+        <p class="hint">Choose your counterpart:</p>
+        <div class="row">${Object.keys(PERSONAS).map(nm =>
+          `<button class="btn" onclick="startRoleplay('${nm}')">${nm}</button>`).join("")}</div>
+      </div>`;
+    } else {
+      m.innerHTML = `<div class="card">
+        <div class="row" style="justify-content:space-between"><strong>🎭 ${rp.persona}</strong>
+          <button class="btn btn-ghost" onclick="window._rp=null;renderMain()">↩ Change counterpart</button></div>
+        <div class="rp-log">${rp.msgs.map(mm =>
+          `<div class="rp-msg ${mm.who === "you" ? "rp-you" : "rp-them"}">${esc(mm.text)}</div>`).join("")}
+          ${rp.waiting ? '<div class="rp-msg rp-them"><em>…</em></div>' : ""}</div>
+        ${recorderRow("roleplay", "Record your reply")}
+        <textarea id="rp_input" placeholder="...or type your response. Hit Reply to send whichever you gave."></textarea>
+        <div class="row">
+          <button class="btn btn-primary" onclick="sendRoleplay()">Reply</button>
+          <button class="btn" id="go_roleplay" data-label="🏁 End & get coached" onclick="coachRoleplay()">🏁 End & get coached</button>
+        </div>
+        <div id="out_roleplay"></div>
+      </div>`;
+    }
+  } else if (activeTab === "meeting") {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem("ns_meeting")); } catch (e) { /* corrupt state */ }
+    if (!saved) {
+      m.innerHTML = `<div class="card">
+        <p><strong>Train for a real moment.</strong> Describe an actual upcoming situation — a pitch, a review, a difficult conversation — and get a training circuit built for it: the hard questions you'll face, the right framework, and coaching on your answers.</p>
+        <details class="neuro"><summary>🧠 Why this works</summary><div><strong>Context-dependent encoding.</strong> Practice transfers best when it matches the retrieval context. Rehearsing YOUR meeting — its audience, its objections, its stakes — builds the exact circuits you'll fire in the room.</div></details>
+        <textarea id="mt_desc" placeholder="e.g. On Thursday I'm pitching the executive team that AI transformation needs its own function, at the same level as the other functions — so I can influence decisions directly."></textarea>
+        <div class="row"><button class="btn btn-primary" id="mt_build" onclick="buildCircuit()">Build my training circuit</button></div>
+        <div id="out_meeting"></div>
+      </div>`;
+    } else {
+      const c = saved.circuit;
+      m.innerHTML = `<div class="card">
+        <div class="row" style="justify-content:space-between"><strong>🎯 Your situation</strong>
+          <button class="btn btn-ghost" onclick="localStorage.removeItem('ns_meeting');renderMain()">↩ New situation</button></div>
+        <p class="hint">${esc(saved.desc)}</p>
+        <div class="exercise"><strong>Recommended framework: ${esc(c.framework)}</strong>
+          <div class="meta">${esc(c.framework_reason || "")}</div></div>
+        ${c.opener_tip ? `<div class="coachnote">💬 ${esc(c.opener_tip)}</div>` : ""}
+        <h4 style="margin:0.8rem 0 0.3rem;font-size:0.9rem">The questions you need to survive</h4>
+        ${c.questions.map((q, i) => `
+          <div class="exercise">❓ <strong>${esc(q)}</strong></div>
+          ${recorderRow(`meeting${i}`, "Record your answer")}
+          <textarea id="mt_a${i}" placeholder="...or type your answer as you would say it in the room."></textarea>
+          <div class="row"><button class="btn btn-primary" id="go_meeting${i}" data-label="Get coached" onclick="coachMeetingAnswer(${i})">Get coached</button></div>
+          <div id="out_meeting${i}"></div>`).join("")}
+        <div id="out_meeting"></div>
+      </div>`;
+    }
+  } else if (activeTab === "interview") {
+    const iv = window._iv;
+    if (!iv || iv.phase === "setup") {
+      m.innerHTML = `<div class="card">
+        <p><strong>A full mock interview, built for the job you actually want.</strong> Tailored questions (paste the job description for best results), an interviewer who asks follow-ups, per-answer coaching, and a final report card. Your answers get saved to 📇 Answers.</p>
+        <details class="neuro"><summary>🧠 Why this works</summary><div><strong>Context-matched retrieval + stress inoculation.</strong> Rehearsing the real questions, under mild pressure, with immediate feedback is the closest thing to the actual interview your brain can train on — and transfer tracks similarity.</div></details>
+        <label class="fieldlabel">Role you're interviewing for</label>
+        <input type="text" id="iv_role" placeholder="e.g. VP of AI Transformation">
+        <div class="row">
+          <div style="flex:1"><label class="fieldlabel">Seniority</label>
+            <select id="iv_seniority" style="width:100%;padding:0.6rem;border-radius:10px;border:1.5px solid var(--card-border)">${IV_SENIORITIES.map(s => `<option>${s}</option>`).join("")}</select></div>
+          <div style="flex:1"><label class="fieldlabel">Interviewer style</label>
+            <select id="iv_style" style="width:100%;padding:0.6rem;border-radius:10px;border:1.5px solid var(--card-border)">${IV_STYLES.map(s => `<option${s === "Neutral" ? " selected" : ""}>${s}</option>`).join("")}</select></div>
+        </div>
+        <label class="fieldlabel">Job description (optional, recommended)</label>
+        <textarea id="iv_jd" placeholder="Paste the job posting here — questions get tailored to its exact requirements."></textarea>
+        <div class="row"><button class="btn btn-primary" id="iv_start" onclick="ivStart()">Start interview</button></div>
+        <div id="out_interview"></div>
+      </div>`;
+    } else if (iv.phase === "active") {
+      const q = iv.queue[iv.idx];
+      m.innerHTML = `<div class="card">
+        <div class="row" style="justify-content:space-between">
+          <strong>💼 ${esc(iv.setup.role)}</strong>
+          <span class="hint">Question ${iv.idx + 1} of ${iv.queue.length}</span>
+        </div>
+        <div class="exercise">${q.followup ? "↳ <em>Follow-up:</em> " : "❓ "}<strong>${esc(q.text)}</strong></div>
+        ${iv.answered ? "" : `
+          ${recorderRow("interview", "Record your answer")}
+          <textarea id="iv_input" placeholder="...or type your answer. Speak out loud even if you type — the rep is in the speaking."></textarea>
+          <div class="row"><button class="btn btn-primary" id="go_interview" data-label="Submit answer" onclick="ivAnswer()">Submit answer</button>
+            <button class="btn btn-ghost" onclick="window._iv=null;renderMain()">✕ Abandon interview</button></div>`}
+        <div id="out_interview"></div>
+        ${iv.answered ? `<div class="row" style="margin-top:0.6rem"><button class="btn btn-primary" onclick="ivNext()">${iv.idx + 1 >= iv.queue.length ? "🏁 Finish & see report" : "Next question ▸"}</button></div>` : ""}
+      </div>`;
+    } else {
+      const per = {};
+      SKILLS.forEach(s => per[s] = []);
+      iv.results.forEach(r => SKILLS.forEach(s => { if (typeof r.scores[s] === "number") per[s].push(r.scores[s]); }));
+      const avgs = Object.fromEntries(Object.entries(per).filter(([, v]) => v.length).map(([k, v]) => [k, +(v.reduce((a, b) => a + b) / v.length).toFixed(1)]));
+      const overall = iv.results.length ? +(iv.results.reduce((a, r) => a + r.overall, 0) / iv.results.length).toFixed(1) : 0;
+      const verdict = overall >= 8 ? ["Strong hire", "ok"] : overall >= 6.5 ? ["Hire", "ok"] : overall >= 5 ? ["Borderline — close, not yet convincing", "warn"] : ["Not yet — keep drilling", "err"];
+      const weakest = [...iv.results].sort((a, b) => a.overall - b.overall);
+      const fixes = [...new Set(weakest.flatMap(r => r.fixes.slice(0, 1)))].slice(0, 3);
+      m.innerHTML = `<div class="card">
+        <div class="row" style="justify-content:space-between"><strong>📋 Interview report — ${esc(iv.setup.role)}</strong>
+          <button class="btn btn-ghost" onclick="window._iv=null;renderMain()">↩ New interview</button></div>
+        <div class="alert ${verdict[1]}"><strong>Panel verdict: ${verdict[0]}</strong> — overall ${overall}/10 across ${iv.results.length} answers.</div>
+        <div class="pgrid">${Object.entries(avgs).map(([k, v]) => `<div class="score"><div class="lab">${k}</div><div class="val">${v}/10</div></div>`).join("")}</div>
+        ${fixes.length ? `<h4 style="font-size:0.9rem">Top fixes before the real thing</h4><ul>${fixes.map(f => `<li>🎯 ${esc(f)}</li>`).join("")}</ul>` : ""}
+        <h4 style="font-size:0.9rem;margin-top:0.8rem">Question by question</h4>
+        ${iv.results.map(r => `<details class="neuro"><summary>${r.overall}/10 — ${esc(r.q)}</summary><div>
+          <p><strong>You said:</strong> ${esc(r.answer)}</p>
+          ${r.upgraded ? `<div class="upgraded">${esc(r.upgraded)}</div>` : ""}</div></details>`).join("")}
+        <p class="hint" style="margin-top:0.6rem">✅ All answers saved to 📇 Answers — your personal STAR bank for the real interview.</p>
+      </div>`;
+    }
+  } else if (activeTab === "answers") {
+    const answers = getAnswers();
+    if (!answers.length) {
+      m.innerHTML = `<div class="card"><p><strong>📇 Your answer bank is empty.</strong> Finish a 💼 mock interview and your answers — plus their upgraded versions — get saved here automatically. Before a real interview, reread your bank: retrieval of your own polished stories is the highest-yield 20 minutes of prep there is.</p></div>`;
+    } else {
+      m.innerHTML = `<div class="card">
+        <p><strong>📇 Your answer bank</strong> — ${answers.length} saved answer${answers.length !== 1 ? "s" : ""}. Reread before real interviews; practice the weak ones again in 💼 Interview.</p>
+        ${answers.map((a, i) => `<details class="neuro"><summary>${a.overall}/10 · ${esc(a.role || "")} — ${esc(a.q)}</summary><div>
+          <p class="hint">${a.date}</p>
+          <p><strong>Your answer:</strong> ${esc(a.answer)}</p>
+          ${a.upgraded ? `<div class="upgraded">${esc(a.upgraded)}</div>` : ""}
+          <div class="row"><button class="btn btn-ghost" onclick="deleteAnswer(${i})">🗑 Delete</button></div>
+        </div></details>`).reverse().join("")}
+      </div>`;
+    }
+  } else {
+    renderProgress(m);
+  }
+}
+window.renderMain = renderMain;
+window.shuffle = shuffle;
+
+/* ------------------------------ Drill runners ------------------------------ */
+async function runWarmup() {
+  const R = recorders.warmup;
+  if (!R?.blob) return showMsg("warmup", "warn", "Record your run first.");
+  const [tw] = TWISTERS[dailyPick("warmup", TWISTERS.length)];
+  try {
+    setBusy("warmup", true, "Listening closely...");
+    const heard = PREVIEW
+      ? TWISTERS[dailyPick("warmup", TWISTERS.length)][0].replace(/ll/, "l")
+      : await transcribe(R.blob);
+    const acc = +(similarity(tw, heard) * 100).toFixed(1);
+    const wpm = R.duration > 1 ? Math.round(normWords(heard).length / R.duration * 60) : null;
+    let verdict;
+    if (acc >= 90) verdict = `<div class="alert ok">Crisp! Your articulators are warm. Move on to the impromptu round.</div>`;
+    else if (acc >= 70) verdict = `<div class="alert warn">Close — slow down 10% and hit every consonant. Precision first, speed second.</div>`;
+    else verdict = `<div class="alert err">Muddy run. Say it once at half speed, exaggerating each syllable, then re-record.</div>`;
+    $("out_warmup").innerHTML = `<div class="scores">
+        <div class="score"><div class="lab">Diction accuracy</div><div class="val">${acc}%</div></div>
+        ${wpm ? `<div class="score"><div class="lab">Pace</div><div class="val">${wpm} wpm</div></div>` : ""}
+      </div><div class="transcript">What I heard: <em>${esc(heard)}</em></div>${verdict}`;
+    store.push({ date: todayStr(), drill: "warmup", scores: { clarity: Math.min(10, Math.round(acc / 10)) }, overall: +(acc / 10).toFixed(1) });
+  } catch (e) { showMsg("warmup", "err", e.message); }
+  finally { setBusy("warmup", false); }
+}
+async function runImpromptu() {
+  const topic = TOPICS[dailyPick("impromptu", TOPICS.length)];
+  const R = recorders.impromptu;
+  const typed = $("txt_impromptu").value.trim();
+  if (!R?.blob && !typed) return showMsg("impromptu", "warn", "Record or type an answer first.");
+  try {
+    setBusy("impromptu", true, R?.blob ? "Transcribing..." : "Coaching...");
+    let text, extra, prefix = "";
+    if (R?.blob) {
+      text = await transcribe(R.blob);
+      const fillers = countFillers(text);
+      const wpm = R.duration > 1 ? Math.round(normWords(text).length / R.duration * 60) : null;
+      extra = `This was SPOKEN. Duration: ${Math.round(R.duration)}s${wpm ? `, pace: ${wpm} wpm (conversational ideal is 130-160)` : ""}, filler words detected: ${fillers}. Comment on pace and fillers.`;
+      prefix = `<div class="scores">${wpm ? `<div class="score"><div class="lab">Pace</div><div class="val">${wpm} wpm</div></div>` : ""}
+        <div class="score"><div class="lab">Filler words</div><div class="val">${fillers}</div></div></div>
+        <div class="transcript">${esc(text)}</div>`;
+    } else {
+      text = typed;
+      extra = "This was TYPED (client couldn't speak aloud). Skip pace/filler comments.";
+    }
+    setBusy("impromptu", true, "Coaching...");
+    const fb = await getFeedback("Impromptu speaking (60 seconds)", topic, text, extra);
+    renderFeedback("impromptu", "impromptu", fb, prefix);
+  } catch (e) { showMsg("impromptu", "err", e.message); }
+  finally { setBusy("impromptu", false); }
+}
+async function runPrecision() {
+  const passage = PASSAGES[dailyPick("precision", PASSAGES.length)];
+  const rewrite = $("txt_precision").value.trim();
+  if (!rewrite) return showMsg("precision", "warn", "Write your rewrite first.");
+  const ow = passage.split(/\s+/).length, nw = rewrite.split(/\s+/).length;
+  const red = Math.round((1 - nw / ow) * 100);
+  try {
+    setBusy("precision", true);
+    const a = analyzeText(rewrite);
+    const fb = await getFeedback("Concision rewrite",
+      `Rewrite this passage as concisely as possible without losing meaning:\n${passage}`, rewrite,
+      `Original was ${ow} words; client used ${nw} (${red}% reduction). Check no essential meaning was lost.`
+      + (a.found.length ? ` Verbose phrases still present in their rewrite: ${a.found.map(f => `"${f}"`).join(", ")}.` : "")
+      + (a.hedges.length ? ` Hedging language present: ${a.hedges.map(h => `"${h}"`).join(", ")}.` : ""));
+    renderFeedback("precision", "precision", fb,
+      `<div class="scores"><div class="score"><div class="lab">Your version</div><div class="val">${nw} words</div></div>
+       <div class="score"><div class="lab">Reduction</div><div class="val">${red}%</div></div></div>`);
+  } catch (e) { showMsg("precision", "err", e.message); }
+  finally { setBusy("precision", false); }
+}
+async function runStructure() {
+  const sel = window._fw || Object.keys(FRAMEWORKS)[0];
+  const fw = FRAMEWORKS[sel];
+  const prompt = fw.prompts[dailyPick("structure-" + sel, fw.prompts.length)];
+  const R = recorders.structure;
+  const typed = $("txt_structure").value.trim();
+  if (!R?.blob && !typed) return showMsg("structure", "warn", "Record or type an answer first.");
+  try {
+    setBusy("structure", true, R?.blob ? "Transcribing..." : "Coaching...");
+    let text = R?.blob ? await transcribe(R.blob) : typed;
+    const prefix = R?.blob ? `<div class="transcript">${esc(text)}</div>` : "";
+    setBusy("structure", true, "Coaching...");
+    const fb = await getFeedback(`Structured answer using ${sel}`,
+      `${prompt}\n(Required structure: ${fw.structure})`, text,
+      `Grade primarily on whether each element of ${sel} is clearly present and in order.`);
+    renderFeedback("structure", "structure", fb, prefix);
+  } catch (e) { showMsg("structure", "err", e.message); }
+  finally { setBusy("structure", false); }
+}
+async function runVocab() {
+  const [w, d] = WORDS[dailyPick("vocab", WORDS.length)];
+  const sentence = $("txt_vocab").value.trim();
+  if (!sentence) return showMsg("vocab", "warn", "Write a sentence first.");
+  if (!sentence.toLowerCase().includes(w.toLowerCase()))
+    return showMsg("vocab", "warn", `Your sentence needs to actually use “${w}”.`);
+  try {
+    setBusy("vocab", true);
+    const fb = await getFeedback("Vocabulary in context",
+      `Use the word “${w}” (${d}) naturally in a professional sentence.`, sentence,
+      "Judge whether the word is used correctly and sounds natural, not forced.");
+    renderFeedback("vocab", "vocab", fb);
+  } catch (e) { showMsg("vocab", "err", e.message); }
+  finally { setBusy("vocab", false); }
+}
+window.runWarmup = runWarmup; window.runImpromptu = runImpromptu;
+window.runPrecision = runPrecision; window.runStructure = runStructure; window.runVocab = runVocab;
+
+/* ------------------------------ Progress ------------------------------ */
+function renderProgress(m) {
+  const h = store.history;
+  if (!h.length) {
+    m.innerHTML = `<div class="card"><p>No drills completed yet. Your progress will show up here —
+      <strong>consistency beats intensity</strong>, so aim for one drill a day.</p>
+      <div class="row"><button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">⬆️ Import progress from another device</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProgress(event)"></div></div>`;
+    return;
+  }
+  const streak = computeStreak(h);
+  const avgs = skillAverages(h);
+  const overall = +(h.reduce((a, x) => a + x.overall, 0) / h.length).toFixed(1);
+  const weak = Object.keys(avgs).length ? Object.entries(avgs).sort((a, b) => a[1] - b[1])[0][0] : null;
+
+  const dayAge = d => Math.floor((new Date() - new Date(d + "T00:00:00")) / 86400000);
+  const thisWeek = h.filter(x => dayAge(x.date) < 7);
+  const lastWeek = h.filter(x => dayAge(x.date) >= 7 && dayAge(x.date) < 14);
+  let weekly = "";
+  if (thisWeek.length && lastWeek.length) {
+    const avg = arr => +(arr.reduce((a, x) => a + x.overall, 0) / arr.length).toFixed(1);
+    const delta = +(avg(thisWeek) - avg(lastWeek)).toFixed(1);
+    weekly = `<div class="alert ${delta >= 0 ? "ok" : "warn"}"><strong>This week:</strong> ${avg(thisWeek)}/10 average over ${thisWeek.length} drill${thisWeek.length !== 1 ? "s" : ""} — ${delta >= 0 ? "▲ up " + delta : "▼ down " + Math.abs(delta)} vs last week (${avg(lastWeek)}/10).</div>`;
+  } else if (thisWeek.length) {
+    weekly = `<div class="alert ok"><strong>This week:</strong> ${thisWeek.length} drill${thisWeek.length !== 1 ? "s" : ""} done. Complete drills next week too and you'll see week-over-week trends here.</div>`;
+  }
+
+  const byDay = {};
+  for (const x of h) (byDay[x.date] = byDay[x.date] || []).push(x.overall);
+  const days = Object.keys(byDay).sort();
+  const pts = days.map(d => +(byDay[d].reduce((a, b) => a + b) / byDay[d].length).toFixed(1));
+  let chart = "";
+  if (days.length > 1) {
+    const W = 800, H = 170, P = 30;
+    const x = i => P + i * (W - 2 * P) / (days.length - 1);
+    const y = v => H - P - (v / 10) * (H - 2 * P);
+    const line = pts.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+    chart = `<h4 style="margin:1rem 0 0.3rem;font-size:0.85rem">Score over time</h4>
+      <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${[0, 5, 10].map(v => `<line x1="${P}" y1="${y(v)}" x2="${W - P}" y2="${y(v)}" stroke="#E5E3F0"/><text x="4" y="${y(v) + 4}" font-size="11" fill="#64748B">${v}</text>`).join("")}
+      <polyline points="${line}" fill="none" stroke="#4F46E5" stroke-width="2.5"/>
+      ${pts.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="#7C3AED"/>`).join("")}</svg>`;
+  }
+  const focusTab = { clarity: "Warm-Up and Impromptu", concision: "Precision", structure: "Structure", impact: "Impromptu" };
+  m.innerHTML = `<div class="card">
+    ${weekly}
+    <div class="pgrid">
+      <div class="score"><div class="lab">🔥 Streak</div><div class="val">${streak} day${streak !== 1 ? "s" : ""}</div></div>
+      <div class="score"><div class="lab">Drills done</div><div class="val">${h.length}</div></div>
+      <div class="score"><div class="lab">Avg score</div><div class="val">${overall}/10</div></div>
+      <div class="score"><div class="lab">Focus area</div><div class="val" style="font-size:1rem">${weak ? weak[0].toUpperCase() + weak.slice(1) : "—"}</div></div>
+    </div>
+    ${Object.keys(avgs).length ? `<h4 style="font-size:0.85rem">Skill breakdown</h4><div class="pgrid">` +
+      Object.entries(avgs).map(([k, v]) => `<div class="score"><div class="lab">${k}</div><div class="val">${v}/10</div></div>`).join("") + `</div>` : ""}
+    ${chart}
+    ${weak ? `<div class="coachnote">💬 Your lowest average is <strong>${weak}</strong>. Neuroplasticity is use-dependent —
+      the circuit you train is the circuit that grows. Spend extra reps in the <strong>${focusTab[weak]}</strong> drill this week.</div>` : ""}
+    <h4 style="margin:1rem 0 0.3rem;font-size:0.85rem">Recent drills</h4>
+    <table class="hist"><tr><th>Date</th><th>Drill</th><th>Score</th></tr>
+      ${h.slice(-10).reverse().map(x => `<tr><td>${x.date}</td><td>${x.drill}</td><td>${x.overall}/10</td></tr>`).join("")}</table>
+    <div class="row" style="margin-top:0.8rem">
+      <button class="btn btn-ghost" onclick="exportProgress()">⬇️ Export progress</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">⬆️ Import progress</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importProgress(event)">
+      <button class="btn btn-ghost" onclick="if(confirm('Delete all progress?')){localStorage.removeItem('ns_history');renderStreak();renderMain();}">Reset progress</button>
+    </div>
+    <p class="hint">Export moves your streak, scores, and answer bank to another device — import the file there.</p>
+  </div>`;
+}
+
+/* ------------------------------ Modal ------------------------------ */
+function openModal() { $("keyInput").value = store.key; $("modalBg").classList.add("open"); }
+$("settingsBtn").onclick = openModal;
+$("closeModal").onclick = () => $("modalBg").classList.remove("open");
+$("saveKey").onclick = () => { store.key = $("keyInput").value.trim(); $("modalBg").classList.remove("open"); };
+$("clearKey").onclick = () => { store.key = ""; $("keyInput").value = ""; };
+$("modalBg").onclick = (e) => { if (e.target === $("modalBg")) $("modalBg").classList.remove("open"); };
+
+/* ------------------------------ Init ------------------------------ */
+renderStreak();
+renderTabs();
+renderMain();
+const _sb = $("settingsBtn"); if (_sb) _sb.style.display = "none";
+
+/* ------------------------------ Auth + cloud sync (production) ------------------------------ */
+let _syncTimer = null;
+function scheduleSync() {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => {
+    fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        history: store.history,
+        answers: getAnswers(),
+        meeting: JSON.parse(localStorage.getItem("ns_meeting") || "null"),
+      }),
+    }).catch(() => {});
+  }, 1500);
+}
+
+async function ensureAuthAndSync() {
+  try {
+    const me = await fetch("/api/me");
+    if (me.status === 401) { location.href = "/login"; return; }
+    const r = await fetch("/api/data");
+    if (r.ok) {
+      const d = await r.json();
+      if ((d.history || []).length > store.history.length)
+        localStorage.setItem("ns_history", JSON.stringify(d.history));
+      if ((d.answers || []).length > getAnswers().length)
+        localStorage.setItem("ns_answers", JSON.stringify(d.answers));
+      if (d.meeting && !localStorage.getItem("ns_meeting"))
+        localStorage.setItem("ns_meeting", JSON.stringify(d.meeting));
+      renderStreak(); renderMain();
+    }
+  } catch (e) { /* offline — local mode still works */ }
+}
+ensureAuthAndSync();
