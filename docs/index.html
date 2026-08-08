@@ -814,8 +814,25 @@ async function buildCircuit() {
 async function coachMeetingAnswer(i) {
   const saved = JSON.parse(localStorage.getItem("ns_meeting"));
   const q = saved.circuit.questions[i];
-  const ans = $(`mt_a${i}`).value.trim();
-  if (!ans) return showMsg(`meeting${i}`, "warn", "Write your answer first.");
+  let ans = $(`mt_a${i}`).value.trim();
+  let prefix = "";
+  const R = recorders[`meeting${i}`];
+  if (!ans && R?.blob) {
+    if (PREVIEW) return showMsg(`meeting${i}`, "warn", "Voice transcription needs the live app — type your answer in this preview.");
+    setBusy(`meeting${i}`, true, "Transcribing...");
+    try { ans = await transcribe(R.blob); }
+    catch (e) { setBusy(`meeting${i}`, false); return showMsg(`meeting${i}`, "err", e.message); }
+    delete recorders[`meeting${i}`];
+    const fillers = countFillers(ans);
+    const duration = R.duration;
+    if (duration > 1) {
+      const wpm = Math.round(normWords(ans).length / duration * 60);
+      prefix = `<div class="scores"><div class="score"><div class="lab">Pace</div><div class="val">${wpm} wpm</div></div>
+        <div class="score"><div class="lab">Filler words</div><div class="val">${fillers}</div></div></div>`;
+    }
+    prefix += `<div class="transcript">${esc(ans)}</div>`;
+  }
+  if (!ans) return showMsg(`meeting${i}`, "warn", "Record or type your answer first.");
   setBusy(`meeting${i}`, true);
   try {
     const fb = await getFeedback(
@@ -824,7 +841,7 @@ async function coachMeetingAnswer(i) {
       ans,
       `Judge whether the answer actually addresses the question, stays composed, and would land with this specific audience. If structure is weak, recommend the ${saved.circuit.framework} framework.`,
     );
-    renderFeedback(`meeting${i}`, "meeting", fb);
+    renderFeedback(`meeting${i}`, "meeting", fb, prefix);
   } catch (e) { showMsg(`meeting${i}`, "err", e.message); }
   finally { setBusy(`meeting${i}`, false); }
 }
@@ -1287,7 +1304,8 @@ function renderMain() {
         <h4 style="margin:0.8rem 0 0.3rem;font-size:0.9rem">The questions you need to survive</h4>
         ${c.questions.map((q, i) => `
           <div class="exercise">❓ <strong>${esc(q)}</strong></div>
-          <textarea id="mt_a${i}" placeholder="Answer as you would in the room..."></textarea>
+          ${recorderRow(`meeting${i}`, "Record your answer")}
+          <textarea id="mt_a${i}" placeholder="...or type your answer as you would say it in the room."></textarea>
           <div class="row"><button class="btn btn-primary" id="go_meeting${i}" data-label="Get coached" onclick="coachMeetingAnswer(${i})">Get coached</button></div>
           <div id="out_meeting${i}"></div>`).join("")}
         <div id="out_meeting"></div>
