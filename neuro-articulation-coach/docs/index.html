@@ -591,13 +591,34 @@ async function fetchIdeas(task) {
       messages: [{ role: "user", content:
         `Task a communication-training client is about to attempt: ${task}\n\n` +
         `Give exactly 3 short idea sparks (different angles, one line each) and 1 strong opening line. ` +
-        `Do NOT write a full answer — just sparks to get them started.\n` +
+        `Do NOT write a full answer — just sparks to get them started. ` +
+        `The opener must be 15 words or fewer, direct, no throat-clearing or corporate padding.\n` +
         `Format:\n- spark\n- spark\n- spark\nOpener: "..."` }],
       temperature: 0.8, max_tokens: 180,
     }),
   });
   if (!r.ok) throw new Error(`Idea generation failed (${r.status})`);
   return (await r.json()).choices[0].message.content.trim();
+}
+
+async function fetchStructureIdeas(framework, structure, task) {
+  const key = requireKey();
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.7, max_tokens: 300,
+      messages: [{ role: "user", content:
+        `Prompt a client must answer: ${task}\nRequired structure: ${framework} (${structure})\n\n` +
+        `Return JSON: {"example": "...", "sparks": ["...", "..."]}\n` +
+        `- "example": a compact worked example answering THIS exact prompt with the required structure, each part introduced by its label (e.g. "What:", "So what:", "Now what:"). Under 80 words, executive-crisp, no padding.\n` +
+        `- "sparks": 2 one-line angle ideas for a different way to answer.` }],
+    }),
+  });
+  if (!r.ok) throw new Error(`Idea generation failed (${r.status})`);
+  return JSON.parse((await r.json()).choices[0].message.content);
 }
 
 async function showIdeas(id) {
@@ -622,7 +643,7 @@ async function showIdeas(id) {
   let html = "";
   if (kit.angles?.length) html += `<h4>Angles to try</h4><ul>${kit.angles.map(a => `<li>${a}</li>`).join("")}</ul>`;
   if (kit.openers?.length) html += `<h4>Strong openers</h4><ul>${kit.openers.map(o => `<li>${o}</li>`).join("")}</ul>`;
-  if (kit.example) html += `<h4>Worked example</h4><div class="upgraded">${kit.example}</div>`;
+  if (kit.example) html += `<h4>Worked example — generic scenario, same shape</h4><div class="upgraded">${kit.example}</div>`;
   if (kit.shape) html += `<p class="hint">${kit.shape}</p>`;
   box.innerHTML = html + (PREVIEW
     ? `<p class="hint">✨ The deployed app also generates ideas tailored to this exact prompt.</p>`
@@ -630,9 +651,17 @@ async function showIdeas(id) {
   box.classList.remove("hidden");
   if (!PREVIEW) {
     try {
-      const sparks = await fetchIdeas(task);
       const el = $(`sparks_${id}`);
-      if (el) el.outerHTML = `<h4>✨ For this exact prompt</h4><div class="upgraded">${esc(sparks).replace(/\n/g, "<br>")}</div>`;
+      if (id === "structure") {
+        const sel = window._fw || Object.keys(FRAMEWORKS)[0];
+        const data = await fetchStructureIdeas(sel, FRAMEWORKS[sel].structure, task);
+        const bolded = esc(data.example || "").replace(/(^|[.!?”"']\s+)([A-Z][a-zA-Z ]{1,12}):/g, "$1<strong>$2:</strong>");
+        if (el) el.outerHTML = `<h4>✨ Worked example for THIS prompt</h4><div class="upgraded">${bolded}</div>`
+          + (data.sparks?.length ? `<h4>Other angles</h4><ul>${data.sparks.map(s => `<li>${esc(s)}</li>`).join("")}</ul>` : "");
+      } else {
+        const sparks = await fetchIdeas(task);
+        if (el) el.outerHTML = `<h4>✨ For this exact prompt</h4><div class="upgraded">${esc(sparks).replace(/\n/g, "<br>")}</div>`;
+      }
     } catch (e) {
       const el = $(`sparks_${id}`);
       if (el) el.textContent = "Tailored ideas need your API key (⚙️ top right).";
